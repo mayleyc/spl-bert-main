@@ -1,0 +1,45 @@
+validation: false
+name: "xmlcnn-bgc_champ"
+gradient_accum_train: false
+simulated_bs: 64
+
+dataset: "bgc" # rcv1, bgc, bugs, wos, amazon
+taxonomy_path: "data/BGC/bgc_tax.txt"
+
+L2_REG: 0.01
+LEARNING_RATE: 1.0e-3
+BATCH_SIZE: 64
+TEST_BATCH_SIZE: 128
+EPOCHS: 5
+
+CHAMP_LOSS: true
+MATCH_LOSS: false
+
+DEVICE: "cuda"
+TENSORBOARD: false
+
+EPOCHS_TO_KEEP: 2
+SAVE_NON_IMPROVING: false  # Always save all epochs. True also saves non-improving
+EARLY_STOPPING:
+  monitor_key: "loss"
+  patience: 2
+  delta: 0.0001
+  metrics_trend: "decreasing" # The desired tendency of the metric
+EVALUATE_EVERY_K_EPOCHS: 1  # Frequency for metrics and ES check
+
+CLASSIFIER_CONF:
+  output_channel: 64
+  num_bottleneck_hidden: 512
+  dynamic_pool_length: 64
+  dropout: 0.5
+  mode: multichannel # rand static non-static multichannel
+EMBEDDINGS: "data/embeddings/glove.6B.300d.txt"
+NUM_TOKENS: 512
+
+# Reload
+RELOAD: false
+PATH_TO_RELOAD: "" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
+#EPOCH_RELOAD: 2 # Epoch to load (comment to reload the last one)
+
+stratifiedCV: 3
+n_repeats: 2

@@ -1,0 +1,26 @@
+name: RCV1
+
+data_dump: dumps/match/rcv1
+#train:
+#  texts: MAG/train_texts.npy
+#  labels: MAG/train_labels.npy
+#
+#valid:
+#  size: 70534
+
+#test:
+#  texts: MAG/test_texts.npy
+
+embedding:
+  emb_init:
+
+hierarchy: data/RCV1v2/rcv1_tax.txt
+
+output:
+  res: dumps/match/rcv1/results
+
+labels_binarizer: ignore_please
+taxonomy_path: data/RCV1v2/rcv1_tax.txt
+
+model:
+  emb_size: 100

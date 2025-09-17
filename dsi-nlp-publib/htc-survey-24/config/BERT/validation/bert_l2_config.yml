@@ -1,0 +1,35 @@
+PRETRAINED_LM: bert-base-uncased
+FREEZE_BASE: false
+
+dataset: "bugs"
+validation: false
+mode: "bert_l2"
+
+L2_REG: 0.01
+LEARNING_RATE: 2.0e-5 # 5.0e-6 1.0e-5 5.0e-5
+BATCH_SIZE: 8
+TEST_BATCH_SIZE: 8
+EPOCHS: 3
+CLF_STRATEGY: "concat_cls" # cls, concat_cls, avg_cls, mean_last, concat_mean_last, avg_mean_last
+CLF_STRATEGY_NUM_LAYERS: 3 # Only considered for concat/avg CLF_STRATEGIES
+CLASS_BALANCED_WEIGHTED_LOSS: false
+LABEL: "flattened_label" # Which label to use for classification: "label", "flattened_label"
+REMOVE_GARBAGE_TEXT: false # may be important for bugs
+
+DEVICE: "cuda"
+TENSORBOARD: false
+
+EPOCHS_TO_KEEP: 2
+SAVE_NON_IMPROVING: false  # Always save all epochs. True also saves non-improving
+EARLY_STOPPING:
+  monitor_key: "loss"
+  patience: 2
+  delta: 0.0001
+  metrics_trend: "decreasing" # The desired tendency of the metric
+
+# Reload
+RELOAD: false
+PATH_TO_RELOAD: "" # Full path to the model folder (e.g. dump_model) or to the epoch folder
+
+NUM_FOLD: 3
+CV_REPEAT: 2

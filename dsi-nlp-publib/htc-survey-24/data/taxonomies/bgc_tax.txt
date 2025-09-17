@@ -1,0 +1,27 @@
+root Nonfiction Fiction Classics Childrens-Books Teen-Young-Adult Humor Poetry
+Nonfiction Biography-Memoir Cooking Arts-Entertainment Business Crafts-Home-Garden Games Health-Fitness History Parenting Pets Politics Popular-Science Psychology Reference Religion-Philosophy SelfImprovement Sports Travel
+Fiction Fantasy Gothic-Horror Graphic-Novels-Manga Historical-Fiction Literary-Fiction Military-Fiction Mystery-Suspense Paranormal-Fiction Romance Science-Fiction Spiritual-Fiction Western-Fiction Womens-Fiction
+Classics Fiction-Classics Literary-Collections Literary-Criticism Nonfiction-Classics
+Childrens-Books Step-Into-Reading Childrens-Middle-Grade-Books
+Teen-Young-Adult Teen-Young-Adult-Action-Adventure Teen-Young-Adult-Mystery-Suspense Teen-Young-Adult-Fantasy-Fiction Teen-Young-Adult-Nonfiction Teen-Young-Adult-Fiction Teen-Young-Adult-Social-Issues Teen-Young-Adult-Historical-Fiction Teen-Young-Adult-Romance Teen-Young-Adult-Science-Fiction
+Biography-Memoir Arts-Entertainment-Biographies-Memoirs Political-Figure-Biographies-Memoirs Historical-Figure-Biographies-Memoirs Literary-Figure-Biographies-Memoirs
+Cooking Regional-Ethnic-Cooking Cooking-Methods Food-Memoir-Travel Baking-Desserts Wine-Beverage
+Arts-Entertainment Art Design Film Music Performing-Arts Photography Writing
+Business Economics Management Marketing
+Crafts-Home-Garden Crafts-Hobbies Home-Garden Weddings
+Health-Fitness Alternative-Therapies Diet-Nutrition Exercise Health-Reference
+History Military-History US-History World-History
+Military-History World-War-II-Military-History World-War-I-Military-History 1950-Present-Military-History
+US-History 21st-Century-US-History 20th-Century-US-History 19th-Century-US-History Civil-War-Period ColonialRevolutionary-Period Native-American-History
+World-History African-World-History Ancient-World-History Asian-World-History European-World-History Latin-American-World-History Middle-Eastern-World-History North-American-World-History
+Politics Domestic-Politics World-Politics
+Popular-Science Science Technology
+Reference Language Test-Preparation
+Religion-Philosophy Religion Philosophy Bibles
+SelfImprovement Beauty Inspiration-Motivation Personal-Finance Personal-Growth
+Travel Travel-Africa Travel-Asia Travel-Australia-Oceania Travel-Caribbean-Mexico Travel-Central-South-America Travel-Europe Travel-Middle-East Specialty-Travel Travel-Writing Travel-USA-Canada
+Fantasy Contemporary-Fantasy Epic-Fantasy Fairy-Tales Urban-Fantasy
+Mystery-Suspense Cozy-Mysteries Crime-Mysteries Espionage-Mysteries Noir-Mysteries Suspense-Thriller
+Romance Contemporary-Romance Erotica Historical-Romance New-Adult-Romance Paranormal-Romance Regency-Romance Suspense-Romance Western-Romance
+Science-Fiction Cyber-Punk Military-Science-Fiction Space-Opera
+Childrens-Middle-Grade-Books Childrens-Middle-Grade-Mystery-Detective-Books Childrens-Middle-Grade-Action-Adventure-Books Childrens-Middle-Grade-Fantasy-Magical-Books Childrens-Middle-Grade-Historical-Books Childrens-Middle-Grade-Sports-Books

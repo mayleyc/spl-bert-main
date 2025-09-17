@@ -1,0 +1,12 @@
+# Ignore folders
+dsi-nlp-publib/htc-survey-24/bert-base-uncased-local
+dsi-nlp-publib/htc-survey-24/dumps
+dsi-nlp-publib/htc-survey-24/out
+spl-bert/spl/C-HMCNN/confusion_matrices
+spl-bert/spl/C-HMCNN/CUB
+spl-bert/spl/C-HMCNN/embeddings
+spl-bert/spl/C-HMCNN/models
+spl-bert/spl/WarcraftShortestPath
+dsi-nlp-publib/htc-survey-24/src/models/HBGL/data_ours
+dsi-nlp-publib/htc-survey-24/wandb
+

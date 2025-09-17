@@ -1,0 +1,31 @@
+root video-games electronics grocery-and-gourmet-food arts-crafts-and-sewing musical-instruments
+video-games video-games_xbox video-games_nintendo video-games_pc video-games_playstation video-games_retro-gaming-microconsoles
+video-games_xbox
+video-games_nintendo
+video-games_pc
+video-games_playstation
+video-games_retro-gaming-microconsoles
+electronics electronics_camera-photo electronics_vehicle-electronics electronics_television-video electronics_headphones electronics_computers-accessories
+electronics_camera-photo
+electronics_vehicle-electronics
+electronics_television-video
+electronics_headphones
+electronics_computers-accessories
+grocery-and-gourmet-food grocery-and-gourmet-food_candy grocery-and-gourmet-food_snack-foods grocery-and-gourmet-food_beverages grocery-and-gourmet-food_cooking-baking grocery-and-gourmet-food_herbs-spices-seasonings
+grocery-and-gourmet-food_candy
+grocery-and-gourmet-food_snack-foods
+grocery-and-gourmet-food_beverages
+grocery-and-gourmet-food_cooking-baking
+grocery-and-gourmet-food_herbs-spices-seasonings
+arts-crafts-and-sewing arts-crafts-and-sewing_painting-drawing-art-print arts-crafts-and-sewing_sewing arts-crafts-and-sewing_beading-jewelry-making arts-crafts-and-sewing_crafting arts-crafts-and-sewing_knitting-crochet
+arts-crafts-and-sewing_painting-drawing-art-print
+arts-crafts-and-sewing_sewing
+arts-crafts-and-sewing_beading-jewelry-making
+arts-crafts-and-sewing_crafting
+arts-crafts-and-sewing_knitting-crochet
+musical-instruments musical-instruments_studio-recording musical-instruments_guitars musical-instruments_other-instruments musical-instruments_microphones musical-instruments_instrument-accessories
+musical-instruments_studio-recording
+musical-instruments_guitars
+musical-instruments_other-instruments
+musical-instruments_microphones
+musical-instruments_instrument-accessories

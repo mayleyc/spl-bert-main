@@ -1,0 +1,16 @@
+stratifiedCV: 3
+n_repeats: 2
+objective: "multiclass" # multiclass / multilabel
+
+dataset: "wos"
+taxonomy_path: "data/WebOfScience/wos_tax.txt"
+
+remove_garbage: true
+stop_words_removal: true
+
+MAX_FEATURES: 30000
+gridsearchCV_SPLITS: 5
+retrain: true
+SVM_GRID_PARAMS:
+  estimator__C: [ 0.01, 0.1, 1, 5, 10 ]
+  estimator__max_iter: [ 100, 200, 500, 1000, 2000 ]

@@ -1,0 +1,18 @@
+root ACPI Alternate-Trees Documentation Drivers File-System IO-Storage Memory-Management Networking Other Platform-Specific-Hardware Power-Management Process-Management SCSI-Drivers Timers Tools Virtualization v4l-dvb
+ACPI ACPI_ACPICA-Core ACPI_BIOS ACPI_Config-Interrupts ACPI_Config-Other ACPI_EC ACPI_Other ACPI_Power-Battery ACPI_Power-Off ACPI_Power-Processor ACPI_Power-Sleep-Wake ACPI_Power-Thermal ACPI_Power-Video
+Alternate-Trees Alternate-Trees_mm
+Documentation Documentation_man-pages
+Drivers Drivers_Bluetooth Drivers_Console-Framebuffers Drivers_Hardware-Monitoring Drivers_I2C Drivers_IEEE1394 Drivers_Input-Devices Drivers_MMC-SD Drivers_Network Drivers_Other Drivers_PCI Drivers_PCMCIA Drivers_Platform Drivers_Platform_x86 Drivers_Serial Drivers_Sound-ALSA Drivers_Staging Drivers_USB Drivers_Video-AGP Drivers_Video-DRI-Intel Drivers_Video-DRI-non-Intel Drivers_Video-Other Drivers_network-wireless Drivers_network-wireless-intel
+File-System File-System_CIFS File-System_NFS File-System_Other File-System_ReiserFS File-System_VFS File-System_XFS File-System_btrfs File-System_ext3 File-System_ext4 File-System_f2fs
+IO-Storage IO-Storage_Block-Layer IO-Storage_IDE IO-Storage_LVM2-DM IO-Storage_MD IO-Storage_Other IO-Storage_SCSI IO-Storage_Serial-ATA
+Memory-Management Memory-Management_Other Memory-Management_Page-Allocator Memory-Management_Sanitizers Memory-Management_Slab-Allocator
+Networking Networking_IPV4 Networking_IPV6 Networking_Netfilter-Iptables Networking_Other Networking_Wireless
+Other Other_Bug-Tracker Other_Configuration Other_Modules Other_Other
+Platform-Specific-Hardware Platform-Specific-Hardware_ARM Platform-Specific-Hardware_Other Platform-Specific-Hardware_PPC-32 Platform-Specific-Hardware_PPC-64 Platform-Specific-Hardware_i386 Platform-Specific-Hardware_x86-64
+Power-Management Power-Management_Hibernation-Suspend Power-Management_Other Power-Management_cpufreq
+Process-Management Process-Management_Other Process-Management_Scheduler
+SCSI-Drivers SCSI-Drivers_Other
+Timers Timers_Other
+Tools Tools_Other Tools_Trace-cmd-Kernelshark
+Virtualization Virtualization_kvm
+v4l-dvb v4l-dvb_dvb-usb v4l-dvb_webcam

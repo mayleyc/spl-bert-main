@@ -1,0 +1,26 @@
+name: BGC
+
+data_dump: dumps/match/bgc
+#train:
+#  texts: MAG/train_texts.npy
+#  labels: MAG/train_labels.npy
+#
+#valid:
+#  size: 70534
+
+#test:
+#  texts: MAG/test_texts.npy
+
+embedding:
+  emb_init:
+
+hierarchy: data/BGC/bgc_tax.txt
+
+output:
+  res: dumps/match/bgc/results
+
+labels_binarizer: ignore_please
+taxonomy_path: data/BGC/bgc_tax.txt
+
+model:
+  emb_size: 100

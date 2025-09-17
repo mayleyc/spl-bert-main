@@ -1,0 +1,45 @@
+PRETRAINED_LM: bert-base-uncased
+FREEZE_BASE: false
+
+dataset: "bugs"
+validation: true
+name: "bert_multilabel_champ"
+multilabel: true
+taxonomy_path: "data/bugs_tax.txt"
+gradient_accum_train: false
+simulated_bs: 64
+
+L2_REG: 0.01
+LEARNING_RATE: 2.0e-5 # 5.0e-6 1.0e-5 5.0e-5
+BATCH_SIZE: 8
+TEST_BATCH_SIZE: 8
+EPOCHS: 20
+CLF_STRATEGY: "concat_cls" # cls, concat_cls, avg_cls, mean_last, concat_mean_last, avg_mean_last
+CLF_STRATEGY_NUM_LAYERS: 3 # Only considered for concat/avg CLF_STRATEGIES
+CLASS_BALANCED_WEIGHTED_LOSS: false
+LABEL: "flattened_label" # Which label to use for classification: "label", "flattened_label"
+ALL_LABELS:
+  - "label"
+  - "flattened_label"
+REMOVE_GARBAGE_TEXT: false # may be important for bugs
+CHAMP_LOSS: true
+
+DEVICE: "cuda"
+TENSORBOARD: false
+
+EPOCHS_TO_KEEP: 2
+SAVE_NON_IMPROVING: false  # Always save all epochs. True also saves non-improving
+EARLY_STOPPING:
+  monitor_key: "loss"
+  patience: 2
+  delta: 0.0001
+  metrics_trend: "decreasing" # The desired tendency of the metric
+EVALUATE_EVERY_K_EPOCHS: 1  # Frequency for metrics and ES check
+
+# Reload
+RELOAD: false
+PATH_TO_RELOAD: "dumps/bert4c/bert_multilabel_concat_cls_3/run_2022-08-31_11-57-50" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
+EPOCH_RELOAD: 15 # Epoch to load (comment to reload the last one)
+
+NUM_FOLD: 3
+CV_REPEAT: 1

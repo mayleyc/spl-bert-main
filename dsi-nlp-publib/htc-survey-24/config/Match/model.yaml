@@ -1,0 +1,42 @@
+name: MATCH
+device: "cuda" # only works with CUDA
+
+model:
+  hidden_size: 100
+  n_layers: 3
+  n_probes: 8
+  n_aheads: 2
+  intermediate_size: 400
+  dropout: 0.1
+  src_max_len: 500
+
+train:
+  batch_size: 256
+  nb_epoch: 100
+  swa_warmup: 4
+  lr: 1.0e-4
+
+valid:
+  batch_size: 256
+
+predict:
+  batch_size: 256
+
+path: out/dumps/match/models
+
+# Training par
+NUM_FOLD: 3
+CV_REPEAT: 2
+LABEL: "flattened_label" # Which label to use for classification: "label", "flattened_label"
+ALL_LABELS:
+  - "label"
+  - "flattened_label"
+
+validation: false
+
+# W2V
+min_word_frequency: 5
+embed_size: 100
+word2vec_epochs: 10
+remove_garbage: true
+max_vocab_size: 50000

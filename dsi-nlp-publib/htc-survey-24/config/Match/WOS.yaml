@@ -1,0 +1,26 @@
+name: WOS
+
+data_dump: dumps/match/wos
+#train:
+#  texts: MAG/train_texts.npy
+#  labels: MAG/train_labels.npy
+#
+#valid:
+#  size: 70534
+
+#test:
+#  texts: MAG/test_texts.npy
+
+embedding:
+  emb_init:
+
+hierarchy: data/WebOfScience/wos_tax.txt
+
+output:
+  res: dumps/match/wos/results
+
+labels_binarizer: ignore_please
+taxonomy_path: data/WebOfScience/wos_tax.txt
+
+model:
+  emb_size: 100
