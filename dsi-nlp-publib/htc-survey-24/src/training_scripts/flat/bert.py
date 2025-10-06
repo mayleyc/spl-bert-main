@@ -14,6 +14,8 @@ from src.training_scripts.script_utils import save_results
 from src.utils.generic_functions import load_yaml, get_model_dump_path
 from src.utils.metrics import compute_metrics, compute_hierarchical_metrics
 
+import time
+
 # DEBUG PARAMETERS
 workers = 0
 
@@ -45,7 +47,7 @@ def _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
     trainer.load_previous(trainer.last_saved_checkpoint, model_only=True)
     model = trainer.model
     # Use the model to predict test/validation samples
-    y_pred, y_true, inf_time = _predict(model, test_load, logits_fn)  # (samples, num_classes)
+    y_pred, y_true, inf_time = _predict(model, test_load, config, logits_fn)  # (samples, num_classes)
     # print(f" ---> Inference time x sample: {inf_time / config['TEST_BATCH_SIZE']} ns")
 
     # Compute metrics with sklearn
@@ -158,22 +160,34 @@ def _training_testing_loop(config: Dict,
     os.makedirs(model_folder, exist_ok=True)
     # config["MODEL_FOLDER"] = str(model_folder)
     save_preds = config.get("RELOAD", False)  # <- check if this is a testing run
+    n_repeats = config.get("n_repeats", 1)
     results = list()
     pred_y_list, true_y_list = list(), list()
     # Train in splits
     fold_i: int = 0
     for (x_train, y_train), (x_val, y_val), (x_test, y_test) in dataset.get_split():
         #fold_i += 1
-        print(f"Building model for fold {fold_i}.")
-        config["MODEL_FOLDER"] = str(model_folder / f"fold_{fold_i}")
-        if split_fun is not None:
-            config.update(split_fun(fold_i))
-        metrics, y_pred, y_true = _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
-                                      config, model_class, logits_fn, dataset.binarizer)
-        results.append(metrics)
+        if config["RELOAD"]:
+            for r in range(1, n_repeats + 1):
+                config["MODEL_FOLDER"] = str(model_folder / f"repeat_{r}")
+                metrics, y_pred, y_true = _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
+                                        config, model_class, logits_fn, dataset.binarizer)
+                
+                results.append(metrics)
+
+        else:
+            for r in range(1, n_repeats + 1):
+                print(f"\n=== Repeat {r}/{n_repeats} ===")
+                config["MODEL_FOLDER"] = str(model_folder / f"repeat_{r}")
+                os.makedirs(str(model_folder / f"repeat_{r}"), exist_ok=True)
+                metrics, y_pred, y_true = _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
+                                        config, model_class, logits_fn, dataset.binarizer)
+                
+                results.append(metrics)
         
         # ---------------------------------------
         save_results(results, out_folder, config)
+    
         if save_preds:
             pred_y_list.append(y_pred)
             true_y_list.append(y_true)
@@ -188,7 +202,7 @@ def run_configuration():
     # Paths
     config_base_path: Path = Path("config") / "BERT"
     output_path: Path = Path("dumps") / "BERT"
-    config_list: List = ["bert_wos.yml"] #"bert_amz.yml"] #"bert_bgc.yml", "bert_wos.yml", "bert_rcv1.yml", "bert_bugs.yml", 
+    config_list: List = ["bert_bgc.yml"] #"bert_amz.yml",  #"bert_wos.yml", ] #, "bert_wos.yml", "bert_rcv1.yml", "bert_bugs.yml", 
 
     for c in config_list:
         # Prepare configuration
@@ -214,4 +228,6 @@ def run_configuration():
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     run_configuration()
+    print("--- %s seconds ---" % (time.time() - start_time))

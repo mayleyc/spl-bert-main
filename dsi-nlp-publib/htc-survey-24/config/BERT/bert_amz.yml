@@ -36,9 +36,10 @@ EARLY_STOPPING:
 EVALUATE_EVERY_K_EPOCHS: 1  # Frequency for metrics and ES check
 
 # Reload
-RELOAD: True
+RELOAD: False
 PATH_TO_RELOAD: "dumps/BERT/bert_multilabel_AMZ_concat_cls_3/run_2025-08-19_13-24-54" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
 EPOCH_RELOAD: 3 # Epoch to load (comment to reload the last one)
 
 stratifiedCV: 2 #2 for BERT embedding extraction, 3 for normal BERT
-n_repeats:  1 #1 for BERT embedding extraction, 2 for normal BERT
+n_repeats:  3 #1 for BERT embedding extraction, 2 for normal BERT
+spl: False

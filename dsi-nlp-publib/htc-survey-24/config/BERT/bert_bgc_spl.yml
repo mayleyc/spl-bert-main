@@ -1,11 +1,11 @@
 PRETRAINED_LM: bert-base-uncased
 FREEZE_BASE: false
 
-dataset: "amazon" # rcv1, bgc, bugs, wos, amazon
+dataset: "bgc" # rcv1, bgc, bugs, wos, amazon
 validation: false
-name: "bert_multilabel_AMZ"
+name: "bert_multilabel_BGC"
 multilabel: true
-taxonomy_path: "data/Amazon/amazon_tax.txt"
+taxonomy_path: "data/BGC/bgc_tax.txt"
 gradient_accum_train: false
 simulated_bs: 64
 
@@ -13,7 +13,7 @@ L2_REG: 0.01
 LEARNING_RATE: 2.0e-5 # 5.0e-6 1.0e-5 5.0e-5
 BATCH_SIZE: 8
 TEST_BATCH_SIZE: 8
-EPOCHS: 4
+EPOCHS: 3
 CLF_STRATEGY: "concat_cls" # cls, concat_cls, avg_cls, mean_last, concat_mean_last, avg_mean_last
 CLF_STRATEGY_NUM_LAYERS: 3 # Only considered for concat/avg CLF_STRATEGIES
 CLASS_BALANCED_WEIGHTED_LOSS: false
@@ -21,7 +21,7 @@ LABEL: "flat_label" # Which label to use for classification: "label", "flattened
 ALL_LABELS: "labels"
 REMOVE_GARBAGE_TEXT: false # may be important for bugs
 CHAMP_LOSS: false
-MATCH_LOSS: true
+MATCH_LOSS: false
 
 DEVICE: "cuda"
 TENSORBOARD: false
@@ -37,9 +37,9 @@ EVALUATE_EVERY_K_EPOCHS: 1  # Frequency for metrics and ES check
 
 # Reload
 RELOAD: False
-PATH_TO_RELOAD: "dumps/BERT_MATCH/bert_multilabel_AMZ_concat_cls_3/run_2025-08-25_05-26-47" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
-#EPOCH_RELOAD: 3 # Epoch to load (comment to reload the last one)
+PATH_TO_RELOAD: "dumps/BERT/bert_multilabel_BGC_concat_cls_3/run_2025-08-19_21-28-59" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
+EPOCH_RELOAD: 3 # Epoch to load (comment to reload the last one)
 
-stratifiedCV: 2 # Number of folds: 3
-n_repeats: 3 # Number of repeats for each fold - changed from 2 to 1
-spl: False
+stratifiedCV: 2 #3
+n_repeats: 3 #2
+spl: True

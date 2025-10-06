@@ -37,6 +37,23 @@ class CircuitMPE:
     def overparameterize(self, S=2):
         self.beta = self.beta.overparameterize(S)
         self.beta.vtree = self.vtree
+    
+    def to(self, device):
+        # Move mixing tensors if they exist
+        if hasattr(self.beta, 'mixing') and self.beta.mixing is not None:
+            self.beta.mixing = self.beta.mixing.to(device)
+        if hasattr(self.beta, 'root_mixing') and self.beta.root_mixing is not None:
+            self.beta.root_mixing = self.beta.root_mixing.to(device)
+        if hasattr(self.beta, 'theta') and self.beta.theta is not None:
+            self.beta.theta = self.beta.theta.to(device)
+
+        # If beta has num_branches sum nodes with tensors
+        if hasattr(self.beta, 'num_branches'):
+            for _, nodes in self.beta.num_branches.items():
+                for node in nodes:
+                    if hasattr(node, 'theta') and node.theta is not None:
+                        node.theta = node.theta.to(device)
+        return self
 
     def rand_params(self):
         self.beta.rand_parameters()

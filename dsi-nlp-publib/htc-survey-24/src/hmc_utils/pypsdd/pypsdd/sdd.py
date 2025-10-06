@@ -5,8 +5,8 @@ EPS = 1e-12
 import torch
 from torch import log
 
-DEVICE = torch.device(torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
-DEVICE = torch.device("cuda")#torch.device(torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#DEVICE = torch.device("cpu")#torch.device(torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
 
 from torch import Tensor    
 def logsumexp(tensor: Tensor, dim: int, keepdim: bool = False) -> Tensor:
@@ -70,7 +70,7 @@ logaddexp = SafeLogAddExp.apply
 #    z = z.masked_fill_(mask, -float('inf'))
 #
 #    return z
-
+#
 #def logaddexp(x: Tensor, y: Tensor) -> Tensor:
 #    with torch.no_grad():
 #        m = torch.maximum(x, y)
@@ -451,7 +451,7 @@ class SddNode:
         return enum.enumerator(self)
 
     def minimum_cardinality(self):
-        "AC: NEED TO TEST"
+        """AC: NEED TO TEST"""
         """Computes the minimum cardinality model of an SDD."""
         if self.is_false():   return 0
         if self.is_true():    return 0
@@ -657,7 +657,7 @@ class NormalizedSddNode(SddNode):
 
             if node.is_false():
                 # No configuration on false
-                data = torch.tensor([])
+                data = torch.tensor([], device=DEVICE)
 
             elif node.is_true():
                 data = torch.where(node.theta.argmax(dim=-2) > 0, torch.tensor(node.vtree.var, device=DEVICE), torch.tensor(-node.vtree.var, device=DEVICE))
@@ -669,10 +669,10 @@ class NormalizedSddNode(SddNode):
                 #data = torch.tensor([[node.literal]]*batch_size, device=DEVICE).unsqueeze(-1).expand(-1, -1, 5)
 
             elif node.is_mixing():
-                node.theta = node.theta.transpose(0,1) #Shape: (num_children x batch_size)
-                assert(node.theta.shape[1] == batch_size and node.theta.shape[0] == len(node.elements))
+                theta = node.theta.transpose(0,1) #Shape: (num_children x batch_size)
+                assert(theta.shape[1] == batch_size and theta.shape[0] == len(node.elements))
 
-                max_branch = node.theta.argmax(dim=0, keepdim=True)
+                max_branch = theta.argmax(dim=0, keepdim=True)
 
                 data = torch.tensor([], device=DEVICE)
                 for element in node.elements:
@@ -719,10 +719,10 @@ class NormalizedSddNode(SddNode):
                     continue
 
                 if node.is_false():
-                    data = torch.tensor(0.0) if not log_space else torch.tensor(-float('inf'), device=DEVICE)
+                    data = torch.tensor(0.0, device=DEVICE) if not log_space else torch.tensor(-float('inf'), device=DEVICE)
 
                 elif node.is_true():
-                    data = torch.where((target[:, node.vtree.var - 1] > 0).unsqueeze(-1).expand(-1, 1), node.theta[:, 1], node.theta[:, 0])
+                    data = torch.where((target[:, node.vtree.var - 1] > 0).to(node.theta.device).unsqueeze(-1).expand(-1, 1), node.theta[:, 1], node.theta[:, 0])
 
                 elif node.is_literal():
                     if node.literal > 0:
@@ -736,29 +736,32 @@ class NormalizedSddNode(SddNode):
 
                 elif node.is_mixing():
 
-                    node.theta = node.theta.transpose(0,1) #Shape: (num_children x batch_size)
+                    theta = node.theta.transpose(0,1) #Shape: (num_children x batch_size)
 
                     data = torch.tensor([], device=DEVICE)
                     for element in node.elements:
                         data = torch.cat((data, element.data.unsqueeze(0)), dim=0)
                     #data = torch.stack((e.data for e in node.elements))
                     #import pdb; pdb.set_trace()
-                    data = logsumexp(node.theta + data, dim=0)
+                    data = logsumexp(theta + data, dim=0)
 
                 else: # node.is_decomposition
 
-                    node.theta = node.theta.transpose(0,1) #Shape: (num_children x batch_size)
+                    theta = node.theta.transpose(0,1) #Shape: (num_children x batch_size)
 
                     if log_space:
                         data = None
                         #data = torch.tensor(-float('inf'), device=DEVICE)
                         for i, (p, s) in enumerate(node.positive_elements):
                             if data is None:
-                                data = node.theta[i] + p.data + s.data
+                                #print(node.theta[i].device)
+                                #print(p.data.device)
+                                #print(s.data.device)
+                                data = theta[i].to(DEVICE) + p.data.to(DEVICE) + s.data.to(DEVICE)
                             else:
-                                data = logaddexp(node.theta[i] + p.data + s.data, data)
+                                data = logaddexp(theta[i].to(DEVICE) + p.data.to(DEVICE) + s.data.to(DEVICE), data.to(DEVICE))
                     else:
-                        data = sum([node.theta[i] * p.data * s.data for i, (p,s) in enumerate(node.positive_elements)])
+                        data = sum([theta[i].to(DEVICE) * p.data.to(DEVICE) * s.data.to(DEVICE) for i, (p,s) in enumerate(node.positive_elements)])
 
                 node.data = data
 
@@ -783,7 +786,7 @@ class NormalizedSddNode(SddNode):
 
             if node.is_false():
                 # No configuration on false
-                data = torch.tensor([])
+                data = torch.tensor([], device=DEVICE)
 
             elif node.is_true():
                 sampled_branch = Categorical(probs = node.theta.permute(2, 0, 1)
@@ -854,22 +857,22 @@ class NormalizedSddNode(SddNode):
                 var_marginals[-var] = torch.logaddexp(var_marginals[-var], torch.tensor(-float(300), device=DEVICE) + node.pr_context)
 
             elif node.is_true():
-                node.theta = node.theta.transpose(0, 1) #(children x batch_size x k)
+                theta = node.theta.transpose(0, 1) #(children x batch_size x k)
 
                 var = node.vtree.var
-                var_marginals[ var] = torch.logaddexp(var_marginals[var], node.theta[1] + node.pr_context)
-                var_marginals[-var] = torch.logaddexp(var_marginals[-var], node.theta[0] + node.pr_context)
+                var_marginals[ var] = torch.logaddexp(var_marginals[var], theta[1] + node.pr_context)
+                var_marginals[-var] = torch.logaddexp(var_marginals[-var], theta[0] + node.pr_context)
 
             elif node.is_mixing():
-                node.theta = node.theta.transpose(0, 1)
+                theta = node.theta.transpose(0, 1)
 
                 for i, d in enumerate(node.elements):
-                    d.pr_context = node.theta[i]
+                    d.pr_context = theta[i]
 
             else: # node.is_decomposition()
-                node.theta = node.theta.transpose(0, 1) #(children x batch_size x k)
+                theta_t = node.theta.transpose(0, 1) #(children x batch_size x k)
                 for i, (p,s) in enumerate(node.positive_elements):
-                    theta = node.theta[i]
+                    theta = theta_t[i]
                     p.pr_context = torch.logaddexp(p.pr_context, theta + node.pr_context)
                     s.pr_context = torch.logaddexp(s.pr_context, theta + node.pr_context)
             node.pr_node = node.pr_context
@@ -909,9 +912,9 @@ class NormalizedSddNode(SddNode):
         import torch
         for node in self.as_list(clear_data=clear_data):
             if node.is_false():
-                data = torch.tensor(0.0)
+                data = torch.tensor(0.0, device=DEVICE)
             elif node.is_true():
-                data = torch.tensor(1.0)
+                data = torch.tensor(1.0, device=DEVICE)
             elif node.is_literal():
                 if node.literal > 0:
                     data = litleaves[node.literal-1][1]
@@ -993,14 +996,14 @@ class NormalizedSddNode(SddNode):
 
                 # We associate parameters for true literals, normalized
                 # according to the corresponding vtree
-                node.theta = torch.stack([litleaves[node.vtree.var - 1][0], litleaves[node.vtree.var - 1][1]])
+                node.theta = torch.stack([litleaves[node.vtree.var - 1][0], litleaves[node.vtree.var - 1][1]], device=DEVICE)
 
             elif node.is_decomposition():
 
                 # Calculate, and normalize the distribution at every
                 # decision node
                 node.theta = torch.stack([p.data.clamp(min=1e-16).log() + s.data.clamp(min=1e-16).log()\
-                        for p, s in node.positive_elements])
+                        for p, s in node.positive_elements], device=DEVICE)
 
                 # Calculate the partition function
                 Z = torch.logsumexp(node.theta, dim=0)
@@ -1084,22 +1087,22 @@ class NormalizedSddNode(SddNode):
 
             if node.is_false():
                 #data = torch.tensor(0.0, device=torch.cuda.current_device())
-                data = torch.tensor(0.0)
+                data = torch.tensor(0.0, device=DEVICE)
 
             elif node.is_true():
 
                 # We associate parameters for true literals, normalized
                 # according to the corresponding vtree
-                node.theta = torch.stack([litleaves[node.vtree.var - 1][0], litleaves[node.vtree.var - 1][1]])
+                node.theta = torch.stack([litleaves[node.vtree.var - 1][0], litleaves[node.vtree.var - 1][1]], device=DEVICE)
 
-                data = torch.tensor(1.0)
+                data = torch.tensor(1.0, device=DEVICE)
                 #data = torch.tensor(1.0, device=torch.cuda.current_device())
 
             elif node.is_literal():
 
                 # We associate parameters for true literals, normalized
                 # according to the corresponding vtree
-                node.theta = torch.Tensor([node.literal < 0, node.literal > 0])
+                node.theta = torch.Tensor([node.literal < 0, node.literal > 0], device=DEVICE)
 
                 if node.literal > 0:
                     data = litleaves[node.literal-1][1]
@@ -1111,7 +1114,7 @@ class NormalizedSddNode(SddNode):
 
                 # Calculate, and normalize the distribution at every
                 # decision node
-                node.theta = torch.stack([p.data * s.data for p, s in node.elements])
+                node.theta = torch.stack([p.data * s.data for p, s in node.elements], device=DEVICE)
                 #try:
                 #    node.theta = [p.data * s.data for p, s in node.elements]
                 #    node.theta = torch.cat(node.theta).view(-1, 128)
@@ -1136,7 +1139,7 @@ class NormalizedSddNode(SddNode):
         for node in self.as_list(clear_data=clear_data):
 
             if node.is_false():
-                entropy = torch.tensor(0.0)
+                entropy = torch.tensor(0.0, device=DEVICE)
 
             elif node.is_true():
                 # Entropy of a Bernoulli random variable
@@ -1144,7 +1147,7 @@ class NormalizedSddNode(SddNode):
                         + litleaves[node.vtree.var - 1][1] * torch.log(litleaves[node.vtree.var - 1][1] + EPS)
 
             elif node.is_literal():
-                entropy = torch.tensor(0.0)
+                entropy = torch.tensor(0.0, device=DEVICE)
 
             else: # node.is_decomposition
                 # Entropy of a sum node is the entropy of the distribution over
@@ -1203,7 +1206,7 @@ class NormalizedSddNode(SddNode):
 
         import torch
         from torch.distributions.bernoulli import Bernoulli
-        from torch.distribution.categorical import Categorical
+        from torch.distributions.categorical import Categorical
 
         for node in self.as_list(clear_data=clear_data):
 
@@ -1237,7 +1240,7 @@ class NormalizedSddNode(SddNode):
 
         import torch
         from torch.distributions.bernoulli import Bernoulli
-        from torch.distribution.categorical import Categorical
+        from torch.distributions.categorical import Categorical
 
         for node in self.as_list(clear_data=clear_data):
 
@@ -1469,4 +1472,3 @@ class SddElementEnumerator:
     def __cmp__(self,other):
         assert not self.empty() and not other.empty()
         return cmp(self.heap[0].inst,other.heap[0].inst)
-

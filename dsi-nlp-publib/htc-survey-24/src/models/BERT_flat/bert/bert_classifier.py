@@ -7,6 +7,16 @@ from transformers import AutoModel
 
 from src.utils.torch_train_eval.model import TrainableModel
 
+import joblib
+import networkx as nx
+import numpy as np
+import pandas as pd
+import torchmetrics as tm
+
+import torch
+import torch.nn as nn
+import torch.nn.init as init
+
 
 def mean_emb(emb, mask):
     return (emb * mask).sum(dim=1) / mask.sum(dim=1)  # (bs, dim)
@@ -47,6 +57,8 @@ class BERTForClassification(nn.Module, TrainableModel):
         freeze: bool = config.get("FREEZE_BASE", False)
         add_input_size: int = config.get("additional_input", 0)
 
+        self.device = config.get("device", "cuda:0")
+
         self.lm = AutoModel.from_pretrained(pretrained, config=config)
         if freeze:
             for param in self.lm.base_model.parameters():
@@ -57,6 +69,7 @@ class BERTForClassification(nn.Module, TrainableModel):
                                  "concat_mean_normalized", "concat_pool_cls"]:
             lm_embedding_size *= self.cfnl
         # self.pre_classifier = nn.Linear(in_features=lm_embedding_size, out_features=lm_embedding_size)
+        self.last_layer_size = lm_embedding_size + add_input_size
         self.clf = nn.Linear(lm_embedding_size + add_input_size, class_n_1)
         conf_bert = self.lm.config
         self.__dropout_p = conf_bert.hidden_dropout_prob if conf_bert.model_type == "bert" else conf_bert.dropout
@@ -147,7 +160,7 @@ class BERTForClassification(nn.Module, TrainableModel):
     def constructor_args(self) -> Dict:
         return self.__initial_config
     
-class BERTForClassification_SPL(nn.Module, TrainableModel):
+class BERTForClassification_SPL(nn.Module, TrainableModel): 
     """
     A BERT architecture adapted for sequence classification for adding SPL layers.
     Averaging strategies inspired from: https://link.springer.com/chapter/10.1007/978-981-15-6168-9_13
@@ -165,6 +178,8 @@ class BERTForClassification_SPL(nn.Module, TrainableModel):
         freeze: bool = config.get("FREEZE_BASE", False)
         add_input_size: int = config.get("additional_input", 0)
 
+        self.device = config.get("device", "cuda:0")
+
         self.lm = AutoModel.from_pretrained(pretrained, config=config)
         if freeze:
             for param in self.lm.base_model.parameters():
@@ -175,7 +190,7 @@ class BERTForClassification_SPL(nn.Module, TrainableModel):
                                  "concat_mean_normalized", "concat_pool_cls"]:
             lm_embedding_size *= self.cfnl
         # self.pre_classifier = nn.Linear(in_features=lm_embedding_size, out_features=lm_embedding_size)
-        last_layer_size = lm_embedding_size + add_input_size
+        self.last_layer_size = lm_embedding_size + add_input_size
         self.clf = nn.Linear(lm_embedding_size + add_input_size, 128) # to append SPL
         conf_bert = self.lm.config
         self.__dropout_p = conf_bert.hidden_dropout_prob if conf_bert.model_type == "bert" else conf_bert.dropout
@@ -265,3 +280,4 @@ class BERTForClassification_SPL(nn.Module, TrainableModel):
 
     def constructor_args(self) -> Dict:
         return self.__initial_config
+

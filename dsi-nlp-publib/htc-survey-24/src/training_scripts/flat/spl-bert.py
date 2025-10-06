@@ -8,13 +8,17 @@ import pandas as pd
 import numpy as np
 
 from src.dataset_tools.dataset_manager import DatasetManager
-from src.models.BERT_flat.bert.bert_classifier import BERTForClassification_SPL
+from src.models.BERT_flat.bert.bert_classifier import BERTForClassification, BERTForClassification_SPL
+from src.models.BERT_flat.bert.cmpe import *
+
 from src.models.BERT_flat.utility_functions import _setup_training, _predict
 from src.training_scripts.script_utils import save_results
 from src.utils.generic_functions import load_yaml, get_model_dump_path
 from src.utils.metrics import compute_metrics, compute_hierarchical_metrics
 # misc
 from common import *
+
+import time
 
 # DEBUG PARAMETERS
 workers = 0
@@ -25,10 +29,10 @@ def fn_sigmoid(p, device):
     return p[0].sigmoid().to(device), p[1].to(device)
 
 
-def run_training(config: Dict, dataset: str, model_class, out_folder: Path, split_fun: Optional[Callable] = None):
+def run_training(config: Dict, dataset: str, model_class, out_folder: Path, split_fun: Optional[Callable] = None, **spl_args):
     ds_manager = DatasetManager(dataset_name=dataset, training_config=config)
     _training_testing_loop(config, model_class, ds_manager, out_folder,
-                           logits_fn=fn_sigmoid, split_fun=split_fun)
+                           logits_fn=fn_sigmoid, split_fun=split_fun, **spl_args)
 
 
 def _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
@@ -40,7 +44,7 @@ def _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
                                                      data=x_train, labels=y_train,
                                                      data_val=x_val, labels_val=y_val, data_test=x_test, labels_test=y_test,
                                                      logits_fn=logits_fn,
-                                                     enc_=enc_)
+                                                     enc_=enc_, **spl_args)
     trainer.train(train_load, val_load)
 
     # TEST the model
@@ -49,7 +53,7 @@ def _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
     model = trainer.model
     # Use the model to predict test/validation samples
 
-    y_pred, y_true, inf_time = _predict(model, test_load, logits_fn, **spl_args)  # (samples, num_classes)
+    y_pred, y_true, inf_time = _predict(model, test_load, config, logits_fn)  # (samples, num_classes)
     # print(f" ---> Inference time x sample: {inf_time / config['TEST_BATCH_SIZE']} ns")
 
     # Compute metrics with sklearn
@@ -150,7 +154,7 @@ def _training_testing_loop(config: Dict,
                            out_folder: Path,
                            logits_fn,
                            split_fun: Optional[Callable] = None,
-                           save_name: str = None):
+                           save_name: str = None, **spl_args):
     multilabel, champ_loss, match_loss = config["multilabel"], \
                                          config.get("CHAMP_LOSS", False), \
                                          config.get("MATCH_LOSS", False)
@@ -173,7 +177,7 @@ def _training_testing_loop(config: Dict,
         if split_fun is not None:
             config.update(split_fun(fold_i))
         metrics, y_pred, y_true = _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
-                                      config, model_class, logits_fn, dataset.binarizer)
+                                      config, model_class, logits_fn, dataset.binarizer, **spl_args)
         results.append(metrics)
         
         # ---------------------------------------
@@ -198,12 +202,13 @@ def run_configuration():
         # Prepare configuration
         config_path: Path = (config_base_path / c)
         config: Dict = load_yaml(config_path)
-        specific_model = f"{config['name']}_{config['CLF_STRATEGY']}_{config['CLF_STRATEGY_NUM_LAYERS']}"
         
-        spl = True
+        specific_model = f"{config['name']}_{config['CLF_STRATEGY']}_{config['CLF_STRATEGY_NUM_LAYERS']}_SPL"
+        
+        spl = config['spl']
         dataset_name = config["dataset"]
         num_st_nodes = hierarchy_num[dataset_name][0]
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         mat = np.load(mat_path_dict[dataset_name])
         # Prepare matrix
         
@@ -221,17 +226,19 @@ def run_configuration():
         out_folder = output_path / specific_model / f"run_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
         kw = dict()
-        if config["RELOAD"] is True:
+        if config.get("RELOAD", False):
             reload_path = Path(config["PATH_TO_RELOAD"])
             kw = dict(split_fun=lambda f: get_model_dump_path(reload_path, f, config.get("EPOCH_RELOAD", None)))
             out_folder = reload_path
 
         # Train
         run_training(config=config,
-                     dataset=config["dataset"],
-                     model_class=BERTForClassification_SPL,
-                     out_folder=out_folder, **kw)
+                    dataset=config["dataset"],
+                    model_class=BERTForClassification_SPL,
+                    out_folder=out_folder, **kw, **spl_args)
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     run_configuration()
+    print("--- %s seconds ---" % (time.time() - start_time))

@@ -70,11 +70,12 @@ class Trainer:
         self._evaluate_metrics_every_k_epochs: int = train_params.get("EVALUATE_EVERY_K_EPOCHS", 1)
         # Torch device (CPU, GPU)
         self.model: Any[TrainableModel, torch.nn.Module] = model.to(self.device)
-        self.model.device = self.device
-        # Add the device attribute to all submodules
+        self.model.device = self.device # to accommodate composite models
+
+        '''# Add the device attribute to all submodules
         for sm in self.model.submodules():
             sm.device = self.device
-            sm.to(self.device)
+            sm.to(self.device)'''
         # Early stopper
         self.early_stopper: EarlyStopping = es
         self.epochs_to_keep: int = train_params["EPOCHS_TO_KEEP"]

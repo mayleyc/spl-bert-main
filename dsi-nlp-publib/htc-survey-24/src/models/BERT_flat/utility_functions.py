@@ -35,7 +35,8 @@ from src.utils.torch_train_eval.early_stopper import EarlyStopping
 from src.utils.torch_train_eval.evaluation import MetricSet
 from src.utils.torch_train_eval.grad_accum_trainer import GradientAccumulatorTrainer
 from src.utils.torch_train_eval.trainer import Trainer
-from hierarchy_dict_gen import AmazonTaxonomyParser, BGCParser
+from hierarchy_dict_gen import AmazonTaxonomyParser, BGCParser, WOSTaxonomyParser
+from src.dataset_tools.dataset_manager import DatasetManager
 
 import os
 import datetime
@@ -51,19 +52,10 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 
-from pysdd.sdd import SddManager, Vtree
 
 import json
 from timeit import default_timer as timer
 
-
-# Circuit imports
-import sys
-sys.path.append(os.path.join(sys.path[0],'src', 'hmc_utils'))
-sys.path.append(os.path.join(sys.path[0],'src', 'hmc_utils', 'pypsdd'))
-
-from src.hmc_utils.GatingFunction import DenseGatingFunction
-from src.hmc_utils.compute_mpe import CircuitMPE
 
 from sklearn import preprocessing
 
@@ -71,6 +63,9 @@ from sklearn import preprocessing
 # misc
 from common import *
 
+import_cmpe = True
+if import_cmpe:
+    from src.models.BERT_flat.bert.cmpe import *
 
 
 def log1mexp(x):
@@ -101,8 +96,11 @@ def get_loss_function(enc_: Path, train_config: Dict, weights=None):
         # Load classes from taxonomy file instead of mlb
         if "amazon" in train_config["taxonomy_path"]:
             tax = AmazonTaxonomyParser(train_config["taxonomy_path"])
-        elif "bgc" in train_config["taxonomy_path"] or "wos" in train_config["taxonomy_path"]:   
+        elif "bgc" in train_config["taxonomy_path"]:   
             tax = BGCParser(train_config["taxonomy_path"])
+        elif "wos" in train_config["taxonomy_path"]:
+            tax = WOSTaxonomyParser(train_config["taxonomy_path"])
+
         tax.parse()  
         _, classes = tax._build_one_hot()
         with open(train_config["taxonomy_path"]) as fin:
@@ -139,6 +137,11 @@ def collate_batch(tokenizer, batch, ml: bool = False):
     x = [t for t, *_ in batch]
     max_len = tokenizer.model_max_length if tokenizer.model_max_length <= 2048 else 512
     encoded_x = tokenizer(x, truncation=True, max_length=max_len, padding=True)
+    '''print("encoded_x:", type(encoded_x)) #dict
+    k, v = next(iter(encoded_x.items()))
+    print("encoded_x item:", type(k), "\n", type(v)) #dict
+    quit()'''
+
     item_x = {key: torch.tensor(val) for key, val in encoded_x.items()}
     y = [t for _, t in batch]
     return item_x, torch.LongTensor(y) if not ml else torch.stack(y, dim=0).long()
@@ -155,7 +158,7 @@ def compute_class_weights(ds) -> torch.FloatTensor:
 
 
 def _setup_training(train_config, model_class: Type, workers: int, data, labels, data_val, labels_val, data_test, labels_test,
-                    logits_fn: Callable, enc_: Path):
+                    logits_fn: Callable, enc_: Path, **spl_args):
     # -------------------------------
     tokenizer = AutoTokenizer.from_pretrained(train_config["PRETRAINED_LM"])
     # dataset_class = TransformerDatasetFlat
@@ -168,8 +171,24 @@ def _setup_training(train_config, model_class: Type, workers: int, data, labels,
     val_data = TransformerDatasetFlat(data_val, labels_val, **args_d)
     test_data = TransformerDatasetFlat(data_test, labels_test, **args_d)
     train_config["n_class"] = train_data.n_y
+    spl = train_config["spl"]
     # Initialize model
-    model = model_class(**train_config)
+    if spl:
+        base_model = model_class(**train_config)
+
+        spl_ns = SimpleNamespace(**spl_args)
+        
+        device = getattr(spl_ns, "device", "cuda:0")  # default device
+        dataset_name = getattr(spl_ns, "dataset_name", None)
+        mat = getattr(spl_ns, "mat", None)
+        num_st_nodes = getattr(spl_ns, "num_st_nodes", None)
+        size = base_model.last_layer_size # get size of last layer from model
+
+        cmpe, gate, R = get_circuit(device, dataset_name, mat, size, num_st_nodes, S = 2, gates=2, num_reps=1)
+        model = SPLBERTModel(cmpe, gate, base_model=base_model)
+
+    else:
+        model = model_class(**train_config)
 
     # Initialize Optimizer and loss
     opt = torch.optim.AdamW(model.parameters(), lr=train_config["LEARNING_RATE"], weight_decay=train_config["L2_REG"])
@@ -200,6 +219,9 @@ def _setup_training(train_config, model_class: Type, workers: int, data, labels,
             print("Using CE loss (multiclass)")
     else:
         loss_func = get_loss_function(enc_, train_config, weights=w)
+    
+    if spl:
+        loss_func = lambda pred, y, nll, l, device: nll #uses nll instead of standard loss
 
     # -------------------------------
     # Metrics
@@ -251,6 +273,7 @@ def _setup_training_kfold(train_config, model_class: Type, workers: int, data, l
     validation_loader = torch.utils.data.DataLoader(val_data, batch_size=train_config["TEST_BATCH_SIZE"],
                                                     num_workers=workers, shuffle=True,
                                                     collate_fn=lambda x: collate_batch(tokenizer, x, ml=multilabel))
+    
     # -------------------------------
     w = None
     if train_config["CLASS_BALANCED_WEIGHTED_LOSS"] is True:
@@ -289,165 +312,13 @@ def _setup_training_kfold(train_config, model_class: Type, workers: int, data, l
     return trainer, training_loader, validation_loader
 
 
-def _predict(model, loader, logits_fn: Callable, t=.5, **spl_args):
+def _predict(model, loader, config, logits_fn: Callable, t=.5):
     model.train(False)
     y_pred = list()
     y_true = list()
     infer_time_batch: int = 0
     
-    spl_ns = SimpleNamespace(**spl_args)
-    spl = getattr(spl_ns, "spl", False)
-    device = getattr(spl_ns, "device", "cuda:0")  # default device
-    dataset_name = getattr(spl_ns, "dataset_name", None)
-    mat = getattr(spl_ns, "mat", None)
-    num_st_nodes = getattr(spl_ns, "num_st_nodes", None)
-
-    # SPL circuit initialization
-    if spl:
-        if not os.path.isfile('constraints/' + dataset_name + '_excl' + '.sdd') or not os.path.isfile('constraints/' + dataset_name + '_excl' + '.vtree'):
-            # Compute matrix of ancestors R
-            # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
-            #np.savetxt("foo.csv", mat, delimiter=",") #Check mat
-            R = np.zeros(mat.shape)
-            np.fill_diagonal(R, 1)
-            g = nx.DiGraph(mat)
-            layer_map = layer_mapping_BFS(g.reverse(copy=True), num_st_nodes) # 1-indexed # keep original g
-            #print(layer_map)
-            #quit()
-            for i in range(len(mat)):
-                descendants = list(nx.descendants(g, i))
-                if descendants:
-                    R[i, descendants] = 1
-            R = torch.tensor(R)
-
-            #Transpose to get the ancestors for each node 
-            R = R.unsqueeze(0).to(device)
-
-            # Uncomment below to compile the constraint
-            R.squeeze_()
-            mgr = SddManager(
-                var_count=R.size(0),
-                auto_gc_and_minimize=True)
-            
-            max_layer = max(layer_map.values())
-
-            me_layers = layer_map.values() #{l for l in layer_map.values() if l != max_layer} #{l for l in layer_map.values() if l != max_layer} #{max_layer-1, max_layer} #layer_map.values() #
-            nz_layers = {0} #bgc has Level 1 annotations :(
-
-            alpha = mgr.true()
-            alpha.ref()
-
-            print("alpha before anything:", alpha.is_true(), alpha.is_false(), alpha.model_count())
-
-            for layer in set(nz_layers) | set(me_layers):
-                layer_nodes = [k for k in range(len(layer_map)) if layer_map[k] == layer]
-
-                if not layer_nodes:
-                    continue
-
-                zeta = mgr.true(); zeta.ref()   # default true if not needed
-                delta = mgr.true(); delta.ref()
-
-                if layer in nz_layers:
-                    old_zeta = zeta
-                    zeta = mgr.false(); zeta.ref() # initialize for NZ disjunction
-                    old_zeta.deref()
-                    for k in layer_nodes:
-                        old_zeta = zeta
-                        zeta = zeta | mgr.vars[k+1] # cumulative
-                        zeta.ref()
-                        old_zeta.deref()
-
-                if layer in me_layers:
-                    old_delta = delta
-                    delta = mgr.true(); delta.ref()
-                    old_delta.deref()
-                    for s1, s2 in combinations(layer_nodes, 2):
-                        old_delta = delta
-                        delta = delta & (-mgr.vars[s1+1] | -mgr.vars[s2+1]) # only 1 per pair
-                        delta.ref()
-                        old_delta.deref()
-
-                me_nz = delta & zeta
-                me_nz.ref()
-
-                old_alpha = alpha
-                alpha = alpha & me_nz
-                alpha.ref()
-                old_alpha.deref()
-
-            print("alpha after both delta & zeta hierarchy:", alpha.is_true(), alpha.is_false(), alpha.model_count())
-            #print_satisfying_configs(alpha, R.size(0))
-
-
-            for i in range(R.size(0)): # ONE CHILD PER LEVEL
-                beta = mgr.false()
-                beta.ref()
-
-                has_child = False
-                for j in range(R.size(1)):
-
-                    if R[i][j] and i != j: # why not R[j][i]?
-                        has_child = True
-                        old_beta = beta
-                        beta = beta | mgr.vars[j+1] # conjunction of all of its children: true & j1 & j2 & ...
-                        beta.ref()
-                        old_beta.deref()
-
-                if has_child:
-                    old_beta = beta
-                    beta = -mgr.vars[i+1] | beta
-                    beta.ref()
-                    old_beta.deref()
-                else:
-                    # leaf: parent allowed without restriction
-                    old_beta = beta
-                    beta = mgr.true()
-                    beta.ref()
-                    old_beta.deref()
-
-                old_alpha = alpha
-                alpha = alpha & beta
-                alpha.ref()
-                old_alpha.deref()
-
-            print("alpha after beta hierarchy:", alpha.is_true(), alpha.is_false(), alpha.model_count()) #25 because no ME
-            #print_satisfying_configs(alpha, R.size(0))
-
-
-            alpha.save(str.encode('constraints/' + dataset_name + '_excl'+ '.sdd'))
-            alpha.vtree().save(str.encode('constraints/' + dataset_name + '_excl'+ '.vtree'))
-            
-
-
-        # Create circuit object
-        cmpe = CircuitMPE('constraints/' + dataset_name + '_excl'+ '.vtree', 'constraints/' + dataset_name + '_excl'+ '.sdd')
-
-        if args.S > 0:
-            cmpe.overparameterize(S=args.S)
-            print("Done overparameterizing")
-
-        # Create gating function
-        gate = DenseGatingFunction(cmpe.beta, gate_layers=[128] + [256]*args.gates, num_reps=args.num_reps).to(device)
-
-        R = None
-
-    '''
-    else:
-        # Use fully-factorized sdd
-        mgr = SddManager(var_count=mat.shape[0], auto_gc_and_minimize=True)
-        alpha = mgr.true()
-        vtree = Vtree(var_count = mat.shape[0], var_order=list(range(1, mat.shape[0] + 1)))
-        alpha.save(str.encode('ancestry.sdd'))
-        vtree.save(str.encode('ancestry.vtree'))
-        cmpe = CircuitMPE('ancestry.vtree', 'ancestry.sdd')
-        cmpe.overparameterize()
-
-        # Gating function
-        gate = DenseGatingFunction(cmpe.beta, gate_layers=[128]).to(device) #changed 462 to 128. why 462?
-
-        R = None
-    '''
+    spl = config["spl"]    
 
     with torch.no_grad():
         for i, pred_data in tqdm(enumerate(loader), total=len(loader)):
@@ -456,18 +327,16 @@ def _predict(model, loader, logits_fn: Callable, t=.5, **spl_args):
             args = model(pred_data) #tuple of 4
             infer_time_end: int = time.perf_counter_ns()
             infer_time_batch += infer_time_end - infer_time_start
-            l, y, *_ = args
+             # logits - labels - etc
             if spl:
-                thetas = gate(l)
+                l, y, loss, *_ = args
+                pred = (l > 0).long()
 
                 # negative log likelihood and map = CE loss (output from circuit)
                 #cmpe.set_params(thetas)
                 #nll = cmpe.cross_entropy(y, log_space=True).mean()
-
-                cmpe.set_params(thetas)
-                pred = (cmpe.get_mpe_inst(x.shape[0]) > 0).long()
-                
             else:
+                l, y, *_ = args
                 pred, _ = logits_fn(args, device="cpu")
                 pred = torch.where(pred > t, 1, 0)
 
@@ -509,7 +378,7 @@ def train_single_split(x_train, x_test, y_train, y_test, config: Dict, model_cla
     trainer.load_previous(trainer.last_saved_checkpoint, model_only=True)
     model = trainer.model
     # Use the model to predict test/validation samples
-    y_pred, y_true = _predict(model, val_load, logits_fn)  # (samples, num_classes)
+    y_pred, y_true = _predict(model, val_load, config, logits_fn)  # (samples, num_classes)
 
     # Compute metrics with sklearn
     metrics = compute_metrics(y_true, y_pred, argmax_flag=False)
@@ -528,7 +397,7 @@ def train_single_split(x_train, x_test, y_train, y_test, config: Dict, model_cla
 def _training_testing_loop(config_path: Path, model_class: Type, workers: int,
                            data_samples: Union[List[Dict[str, Any]], Callable[[str], List[Dict[str, Any]]]],
                            out_folder: Path, logits_fn, validation: bool = False, save_name: str = None, split_fun=None,
-                           cv_splits: bool = True):
+                           cv_splits: bool = False):
     config = load_yaml(config_path)
 
     multilabel, champ_loss, match_loss = config["multilabel"], \
@@ -546,18 +415,21 @@ def _training_testing_loop(config_path: Path, model_class: Type, workers: int,
     os.makedirs(model_folder, exist_ok=True)
     config["MODEL_FOLDER"] = str(model_folder)
     results = list()
+    n_repeats = config.get("n_repeats", 1)
+
+    tickets: List[str] = [d["text"] for d in data_samples]
+    labels: List[str] = [d[config["LABEL"]] for d in data_samples]
+    labels_all = labels
+    if "ALL_LABELS" in config and multilabel:
+        labels_all: List[List[str]] = [d[config["ALL_LABELS"]] for d in data_samples]
+    seeds = load_yaml("config/random_seeds.yml")
+       
+    dataset = DatasetManager(config["dataset"], config)
 
     if cv_splits:
         # Start K-Fold CV, repeating it for better significance
-        seeds = load_yaml("config/random_seeds.yml")
         splitter = RepeatedStratifiedKFold(n_splits=fold_tot, n_repeats=repeats,
-                                           random_state=seeds["stratified_fold_seed"])
-
-        tickets: List[str] = [d["text"] for d in data_samples]
-        labels: List[str] = [d[config["LABEL"]] for d in data_samples]
-        labels_all = labels
-        if "ALL_LABELS" in config and multilabel:
-            labels_all: List[List[str]] = [d[config["ALL_LABELS"]] for d in data_samples]
+                                           random_state=seeds["stratified_fold_seed"]) 
 
         for train_index, test_index in splitter.split(tickets, labels):
             fold_i += 1
@@ -587,13 +459,38 @@ def _training_testing_loop(config_path: Path, model_class: Type, workers: int,
                                          validation)
             results.append(metrics)
     else:
-        train_data = data_samples("train")
-        x_train, y_train = zip(*[(d["text"], d["labels"]) for d in train_data])
-        test_data = data_samples("test")
-        x_test, y_test = zip(*[(d["text"], d["labels"]) for d in test_data])
-        metrics = train_single_split(x_train, x_test, y_train, y_test, config, model_class, workers, logits_fn, enc_,
-                                     validation)
-        results.append(metrics)
+        print("No CV splits, using predefined splits...")
+        if config["RELOAD"]:
+            # RELOAD mode: no new repeats, just load the existing repeats
+            print("Reload mode: loading trained repeats...")
+            for r in range(1, n_repeats + 1):
+                repeat_path = Path(config["PATH_TO_RELOAD"]) / f"repeat_{r}"
+                enc_ = repeat_path / "label_binarizer.jb"
+                (x_train, y_train), (x_test, y_test), (x_val, y_val) = dataset.get_split()
+                x_train = x_train + x_val
+                y_train = y_train + y_val
+                # Load the trained model and compute metrics
+                metrics = train_single_split(
+                    x_train, x_test, y_train, y_test,
+                    config, model_class, workers, logits_fn, enc_, validation
+                )
+                results.append(metrics)
+
+        else:
+            # Normal training: run new repeats
+            for r in range(1, n_repeats + 1):
+                print(f"\n=== Repeat {r}/{n_repeats} ===")
+                repeat_folder = model_folder / f"repeat_{r}"
+                os.makedirs(repeat_folder, exist_ok=True)
+                enc_ = repeat_folder / "label_binarizer.jb"
+                (x_train, y_train), (x_test, y_test), (x_val, y_val) = dataset.get_split()
+                x_train = x_train + x_val
+                y_train = y_train + y_val
+                metrics = train_single_split(
+                    x_train, x_test, y_train, y_test,
+                    config, model_class, workers, logits_fn, enc_, validation
+                )
+                results.append(metrics)
 
     # Average metrics over all folds and save them to csv
     df_results = pd.DataFrame(results)
@@ -607,7 +504,7 @@ def _training_testing_loop(config_path: Path, model_class: Type, workers: int,
 
 def run_training(config_path: Path, dataset: str, model_class, out_folder: Path,
                  workers: int, validation, logits_fn: Callable, split_fun=None):
-    cv_splits = True
+    cv_splits = False
     if dataset == "bugs":
         _, samples = read_bugs()
     elif dataset == "wos":

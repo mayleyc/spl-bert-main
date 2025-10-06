@@ -7,8 +7,8 @@ import torch
 import numpy as np
 import networkx as nx
 
-import torchvision.transforms as T
-import torchvision.transforms.functional as F
+'''import torchvision.transforms as T
+import torchvision.transforms.functional as F'''
 
 
 import os
@@ -26,15 +26,15 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.append(os.path.join(sys.path[0], "."))
 os.environ["DATA_FOLDER"] = "."
-from src.cutils.parser import *
-from src.cutils import datasets
+'''from src.cutils.parser import *
+from src.cutils import datasets'''
 
 csv_path_full = "CUB/bird_info.csv"
 csv_path_mini = "CUB/bird_info_mini.csv"
-mat_path_dict = {"amazon":"amazon_tax_matrix.npy", 
-                 "bgc":"bgc_tax_matrix.npy", 
-                 "wos":"wos_tax_matrix.npy",
-                 "custom":"custom.npy"}
+mat_path_dict = {"amazon":"../../spl-bert/spl/C-HMCNN/amazon_tax_matrix.npy", 
+                 "bgc":"../../spl-bert/spl/C-HMCNN/bgc_tax_matrix.npy", 
+                 "wos":"../../spl-bert/spl/C-HMCNN/wos_tax_matrix.npy",
+                 "custom":"../../spl-bert/spl/C-HMCNN/custom.npy"}
 mat_path_mini = "cub_matrix_mini.npy"
 #images_dir = "CUB/CUB_200_2011/images"
 weights_dir = "models"
@@ -222,7 +222,7 @@ def csv_2_matrix(df):
     mat = np.array(mat).reshape(len(unique_values), len(unique_values))
     return mat
 
-def resize_image(image, height=800, max_width=1333):
+'''def resize_image(image, height=800, max_width=1333):
         """
         Resize the image while maintaining the aspect ratio:
         - The **height** is fixed at `fixed_height` (800).
@@ -240,7 +240,7 @@ def resize_image(image, height=800, max_width=1333):
             new_H, new_W = int(new_H * scale), int(new_W * scale)
 
         return F.resize(image, (new_H, new_W))
-
+'''
 def get_one_hot_labels(label_species: list, csv_path: str):
     label_dict = {}
     df = pd.read_csv(csv_path)
@@ -433,7 +433,7 @@ def convert_ohe_to_1d(y):
     y = torch.where(positives == 1, value, torch.full_like(positives, -1)) #create new tensor where the sum remains the same when positives == 1, else value = -1
     y = y.cpu().numpy()
     return y
-
+'''
 def get_data_and_loaders(dataset_name, batch_size, device):
 
     train, val, test = initialize_dataset(dataset_name, datasets)
@@ -471,7 +471,7 @@ def get_data_and_loaders(dataset_name, batch_size, device):
 
     return train, train_loader, val, valid_loader, test, test_loader
 
-
+'''
 def compute_ancestor_matrix(A, device, transpose=True, no_constraints=False):
     """Compute matrix of ancestors R.
 
@@ -495,7 +495,7 @@ def compute_ancestor_matrix(A, device, transpose=True, no_constraints=False):
 
     return R
 
-# Layer mapping independent of vtree file
+'''# Layer mapping independent of vtree file
 
 def layer_mapping_BFS_old(g): #g = nx.DiGraph(mat)
     #calculate the in-degree of each node: the number of incoming edges to that node
@@ -511,7 +511,7 @@ def layer_mapping_BFS_old(g): #g = nx.DiGraph(mat)
             layer_map[node] = depth
             queue.extend((child, depth+1) for child in g.successors(node)) #add the node's children to the queue
 
-    return layer_map
+    return layer_map'''
 
 def layer_mapping_BFS(g, num_start_nodes=1):
     """

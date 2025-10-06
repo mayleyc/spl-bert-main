@@ -5,13 +5,14 @@ from typing import List, Dict
 from src.models.BERT_flat.bert.bert_classifier import BERTForClassification
 from src.training_scripts.flat.bert import run_training
 from src.utils.generic_functions import load_yaml, get_model_dump_path
+import time
 
 
 def run_configuration():
     # Paths
     config_base_path: Path = Path("config") / "BERT"
     output_path: Path = Path("dumps") / "BERT_MATCH"
-    config_list: List = ["bert_amz_match.yml", "bert_bgc_match.yml", "bert_wos_match.yml"] # , "bert_rcv1_match.yml", "bert_bgc_match.yml", 
+    config_list: List = ["bert_bgc_match.yml"] #  , "bert_rcv1_match.yml", "bert_bgc_match.yml", 
 
     for c in config_list:
         # Prepare configuration
@@ -37,4 +38,6 @@ def run_configuration():
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     run_configuration()
+    print("--- %s seconds ---" % (time.time() - start_time))

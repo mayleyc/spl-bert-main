@@ -35,6 +35,8 @@ class TaxonomyParser():
         #self.node_to_index = {node: idx for idx, node in enumerate(sorted_nodes)}
         #self.all_nodes_list_root = ["root"] + self.all_nodes_list
         self.node_to_index = {node: i for i, node in enumerate(self.all_nodes_list)}
+        #print(type(next(iter(self.node_to_index.keys()))))
+        #quit()
         #self.node_to_index_root = {node: i for i, node in enumerate(self.all_nodes_list_root)} # lengthy
         
 
@@ -42,6 +44,7 @@ class TaxonomyParser():
         one_hot_dict = {}
         for leaf in self.leaf_nodes:
             vec = [0] * len(sorted_nodes)
+            #self.node_to_index: dict
             vec[self.node_to_index[leaf]] = 1
             for ancestor in self.get_ancestors_cached(leaf):
                 vec[self.node_to_index[ancestor]] = 1
@@ -160,7 +163,7 @@ class WOSTaxonomyParser(TaxonomyParser): # leaf-only lines allowed
                         self.child_to_parent[child] = parent
 
                     if idx > 0:
-                        self.leaf_nodes.append(children)
+                        self.leaf_nodes.extend(children)
 
 
 class BGCParser(TaxonomyParser): #of different levels. does not differentiate between levels yet
@@ -181,17 +184,17 @@ class BGCParser(TaxonomyParser): #of different levels. does not differentiate be
                 if len(tokens) > 1:
                     parent = tokens[0]
                     children = tokens[1:]
-                    leaf = tokens[-1]
+                    #leaf = tokens[-1]
 
                     self.parent_nodes.append(parent)
-                    self.leaf_nodes.append(leaf)
+                    #self.leaf_nodes.append(leaf)
 
                     for child in children:
                         self.child_to_parent[child] = parent
                 else:
                     continue
 
-        self.leaf_nodes = self.all_nodes_list #not in self.parent_nodes] #
+        self.leaf_nodes = list(dict.fromkeys(self.all_nodes_list)) #not in self.parent_nodes] #
 
     def _build_one_hot(self): # all are leaves for BGC
         # Final columns order: root first, then parents in order (excluding root), then leaves in order

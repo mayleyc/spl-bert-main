@@ -36,9 +36,10 @@ EARLY_STOPPING:
 EVALUATE_EVERY_K_EPOCHS: 1  # Frequency for metrics and ES check
 
 # Reload
-RELOAD: True
-PATH_TO_RELOAD: "dumps/BERT_MATCH/bert_multilabel_WOS_concat_cls_3/run_2025-08-25_17-46-52" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
+RELOAD: False
+PATH_TO_RELOAD: "dumps/BERT_MATCH/bert_multilabel_WOS_concat_cls_3/run_2025-10-02_12-49-17" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
 #EPOCH_RELOAD: 3 # Epoch to load (comment to reload the last one)
 
 stratifiedCV: 2
-n_repeats: 1
+n_repeats: 3
+spl: False

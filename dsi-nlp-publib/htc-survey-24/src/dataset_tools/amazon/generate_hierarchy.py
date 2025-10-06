@@ -45,7 +45,7 @@ def get_amz_split_jsonl(split: str) -> List:
 def get_amz_val(train_data):
     x = [doc['text'] for doc in train_data]
     y = [doc['labels'] for doc in train_data]
-    X_train, X_val, y_train, y_val = train_test_split(x, y, test_size=66667, train_size=266666, shuffle=False)
+    X_train, X_val, y_train, y_val = train_test_split(x, y, test_size=66667, train_size=266666, shuffle=True)
     return X_train, X_val, y_train, y_val
 
 if __name__ == "__main__":
