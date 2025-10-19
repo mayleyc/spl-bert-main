@@ -12,7 +12,7 @@ def run_configuration():
     # Paths
     config_base_path: Path = Path("config") / "BERT"
     output_path: Path = Path("dumps") / "BERT_MATCH"
-    config_list: List = ["bert_bgc_match.yml"] #  , "bert_rcv1_match.yml", "bert_bgc_match.yml", 
+    config_list: List = ["bert_bgc_match.yml", "bert_amz_match.yml", "bert_wos_match.yml"] #  , "bert_rcv1_match.yml", "bert_bgc_match.yml", 
 
     for c in config_list:
         # Prepare configuration

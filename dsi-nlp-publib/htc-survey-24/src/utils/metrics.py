@@ -8,7 +8,7 @@ import torch
 from networkx import read_adjlist, Graph, is_tree, shortest_path_length
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from sklearn.preprocessing import MultiLabelBinarizer
-from hierarchy_dict_gen import AmazonTaxonomyParser, BGCParser
+from hierarchy_dict_gen import AmazonTaxonomyParser, BGCParser, WOSTaxonomyParser
 
 
 
@@ -110,8 +110,10 @@ def compute_hierarchical_metrics(y_true: Union[np.ndarray, List[List[str]]],
 
     if "amazon" in str(taxonomy_path).lower():
         tax = AmazonTaxonomyParser(str(taxonomy_path))
-    elif "bgc" in str(taxonomy_path).lower() or "wos" in str(taxonomy_path).lower():   
+    elif "bgc" in str(taxonomy_path).lower(): 
         tax = BGCParser(str(taxonomy_path))
+    elif "wos" in str(taxonomy_path).lower():   
+        tax = WOSTaxonomyParser(str(taxonomy_path))
     tax.parse()  
     _, classes = tax._build_one_hot()
 
@@ -148,8 +150,8 @@ def compute_hierarchical_metrics(y_true: Union[np.ndarray, List[List[str]]],
         # nonzero = indices, np.where to convert float throughj threshold, 0 cause tuple, tolist for np array
         predicted_labels = [np.nonzero(x)[0].tolist() for x in np.where(y_pred > threshold, 1, 0)]
         true_labels = [np.nonzero(x)[0].tolist() for x in y_true]
-        predicted_labels = _assign_labels(predicted_labels, encoder_dump_or_mapping.i2v['label'])
-        true_labels = _assign_labels(true_labels, encoder_dump_or_mapping.i2v['label'])
+        predicted_labels = _assign_labels(predicted_labels, encoder_dump_or_mapping.i2v["label"])
+        true_labels = _assign_labels(true_labels, encoder_dump_or_mapping.i2v["label"])
     ahcs = list()
     for pred_sample, true_labels_sample in zip(predicted_labels, true_labels):
         # AHC
@@ -212,8 +214,8 @@ def compute_hierarchical_metrics_old(y_true: Union[np.ndarray, List[List[str]]],
         # nonzero = indices, np.where to convert float throughj threshold, 0 cause tuple, tolist for np array
         predicted_labels = [np.nonzero(x)[0].tolist() for x in np.where(y_pred > threshold, 1, 0)]
         true_labels = [np.nonzero(x)[0].tolist() for x in y_true]
-        predicted_labels = _assign_labels(predicted_labels, encoder_dump_or_mapping.i2v['label'])
-        true_labels = _assign_labels(true_labels, encoder_dump_or_mapping.i2v['label'])
+        predicted_labels = _assign_labels(predicted_labels, encoder_dump_or_mapping.i2v["label"])
+        true_labels = _assign_labels(true_labels, encoder_dump_or_mapping.i2v["label"])
     ahcs = list()
     for pred_sample, true_labels_sample in zip(predicted_labels, true_labels):
         # AHC
@@ -260,12 +262,15 @@ def _extend_label_set(g: nx.DiGraph, labels: List[List[str]]) -> List[List[str]]
         labels_extended.append(list(extended_sample_labels))
     return labels_extended
 
-def transform_manual(class_to_index, y: List[List[str]], classes: List[str]) -> np.ndarray:
+def transform_manual(class_to_index: Dict[str, int], y: List[List[str]], classes: List[str]) -> np.ndarray:
     mhe_extended = np.zeros((len(y), len(classes)), dtype=int)
+
     for i, labels in enumerate(y):
         for label in labels:
-            if label in class_to_index: # checking a dictionary is faster than checking a list
-                mhe_extended[i, class_to_index[label]] = 1
+            if label not in class_to_index:
+                raise ValueError(f"Unknown label '{label}' not in classes")
+            mhe_extended[i, class_to_index[label]] = 1
+
     return mhe_extended
 
 
@@ -282,9 +287,11 @@ def h_multilabel_precision_recall_fscore(labels_true: List[List[str]], labels_pr
     :return: dictionary of H-metrics
     """
     if "amazon" in str(taxonomy_path).lower():
-            tax = AmazonTaxonomyParser(str(taxonomy_path))
-    elif "bgc" in str(taxonomy_path).lower() or "wos" in str(taxonomy_path).lower():   
+        tax = AmazonTaxonomyParser(str(taxonomy_path))
+    elif "bgc" in str(taxonomy_path).lower(): 
         tax = BGCParser(str(taxonomy_path))
+    elif "wos" in str(taxonomy_path).lower():   
+        tax = WOSTaxonomyParser(str(taxonomy_path))
     tax.parse()  
     _, classes = tax._build_one_hot()
     class_to_index = {cls: idx for idx, cls in enumerate(classes)}
@@ -297,11 +304,13 @@ def h_multilabel_precision_recall_fscore(labels_true: List[List[str]], labels_pr
     if classes is not None:
         mhe_extended_predictions: np.ndarray = transform_manual(class_to_index, labels_pred_extended, classes)
         mhe_extended_truth: np.ndarray = transform_manual(class_to_index, labels_true_extended, classes)
+        print("FROM DSI-NLP-PUBLIB:", mhe_extended_truth)
     else:
         mhe_extended_predictions: np.ndarray = _assign_binarization(labels_pred_extended, class_to_index,
                                                                     len(g))  # -1 cause root, new one: no more root
         mhe_extended_truth: np.ndarray = _assign_binarization(labels_true_extended, class_to_index,
                                                               len(g))  # -1 cause root
+        print("FROM DSI-NLP-PUBLIB:", mhe_extended_truth)
 
     # note: this more damage than it helps
     # assert mhe_extended_predictions.shape == mhe_extended_truth.shape, \
@@ -336,7 +345,7 @@ def h_multilabel_precision_recall_fscore_old(labels_true: List[List[str]], label
         mhe_extended_predictions: np.ndarray = lb_encoder.transform(labels_pred_extended)
         mhe_extended_truth: np.ndarray = lb_encoder.transform(labels_true_extended)
     else:
-        mapping = encoder_dump_or_mapping.v2i['label']
+        mapping = encoder_dump_or_mapping.v2i["label"]
         mhe_extended_predictions: np.ndarray = _assign_binarization(labels_pred_extended, mapping,
                                                                     len(g) - 1)  # -1 cause root
         mhe_extended_truth: np.ndarray = _assign_binarization(labels_true_extended, mapping,

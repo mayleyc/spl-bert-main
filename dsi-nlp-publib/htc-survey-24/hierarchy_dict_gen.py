@@ -194,7 +194,7 @@ class BGCParser(TaxonomyParser): #of different levels. does not differentiate be
                 else:
                     continue
 
-        self.leaf_nodes = list(dict.fromkeys(self.all_nodes_list)) #not in self.parent_nodes] #
+        self.leaf_nodes = self.all_nodes_list
 
     def _build_one_hot(self): # all are leaves for BGC
         # Final columns order: root first, then parents in order (excluding root), then leaves in order
@@ -339,7 +339,7 @@ def find_taxonomy_files(base_dir="dataset"):
 # Example usage
 if __name__ == "__main__":
     # Replace with taxonomy file path
-    folder = "/mnt/cimec-storage6/users/nguyenanhthu.tran/2025thesis/spl-bert/spl/C-HMCNN"
+    folder = "csv"
     files = ["data/BGC/bgc_tax.txt", "data/Amazon/amazon_tax.txt", "data/WebOfScience/wos_tax.txt"] 
     for i in files:
         taxonomy_file = i #"data/BGC/bgc_tax.txt" #"data/Amazon/amazon_tax.txt" #"data/WebOfScience/wos_tax.txt" # # 
@@ -356,10 +356,11 @@ if __name__ == "__main__":
         one_hot, _ = parser.get_one_hot()
         result_matrix = parser.get_matrix() 
 
-        '''# Save OHE CSV
+        # Save OHE CSV
         file_path_csv = os.path.join(folder, f"{filename}_one_hot.csv")
-        pd.DataFrame.from_dict(one_hot, orient='index').to_csv(file_path_csv)
-        print(f"One-hot encoding saved to {file_path_csv}")'''
+        df_one_hot = pd.DataFrame.from_dict(one_hot, orient='index', columns=parser.all_nodes_list)
+        df_one_hot.to_csv(file_path_csv)
+        print(f"One-hot encoding saved to {file_path_csv}")
 
         # Save matrix
         file_path_mat = os.path.join(folder, f"{filename}_matrix.npy")

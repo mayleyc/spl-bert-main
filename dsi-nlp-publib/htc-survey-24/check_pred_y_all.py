@@ -3,13 +3,13 @@ import numpy as np
 import pandas as pd
 import pickle
 
-bert_pred_y_fp = "dumps/BERT/bert_multilabel_WOS_concat_cls_3/run_2025-10-02_09-31-05/all_folds_pred_2025-10-02_14-37-40.csv"
+bert_pred_y_fp = "dumps/BERT/bert_multilabel_BGC_concat_cls_3/run_2025-10-19_00-09-26/y_true_repeat_1_2025-10-19_00-19-28.csv"
 bert_match_pred_y_fp = "dumps/BERT_MATCH/bert_multilabel_WOS_concat_cls_3/run_2025-10-02_12-49-17/all_folds_pred_2025-10-02_14-38-56.csv"
 emb_pckl = "/mnt/cimec-storage6/users/nguyenanhthu.tran/2025thesis/spl-bert/spl/C-HMCNN/embeddings/emb_bert-base-uncased_amazon_20250806-183616_val_batch0.pickle"
 
 
-spl_pred_y_fp = "dumps/BERT/bert_multilabel_WOS_concat_cls_3_SPL/run_2025-10-02_12-51-48/all_folds_pred_2025-10-02_14-32-28.csv"
-ohe_dict_from_csv = "/mnt/cimec-storage6/users/nguyenanhthu.tran/2025thesis/spl-bert/spl/C-HMCNN/wos_tax_one_hot.csv" # Replace with csv path
+#spl_pred_y_fp = "dumps/BERT/bert_multilabel_WOS_concat_cls_3_SPL/run_2025-10-02_12-51-48/all_folds_pred_2025-10-02_14-32-28.csv"
+ohe_dict_from_csv = "csv/bgc_tax_one_hot.csv" # Replace with csv path
 
 species_only = False
 #check mutual exclusivity errors (2 leaves or more)
@@ -62,6 +62,7 @@ def count_me(predictions, n_nodes):
         row_sums = np.sum(cut, axis=1)
 
         non_exclusive_rows = np.where(row_sums != 1)[0]
+        more_pred_rows = np.where(row_sums > 1)[0]
         zero_rows = np.where(row_sums == 0)[0]
 
         '''
@@ -76,8 +77,10 @@ def count_me(predictions, n_nodes):
             "level": level,
             "non_exclusive_rows": non_exclusive_rows,
             "zero_rows": zero_rows,
+            "more_pred_rows": more_pred_rows,
             "non_exclusive_count": len(non_exclusive_rows),
             "zero_count": len(zero_rows),
+            "more_pred_count": len(more_pred_rows),
         }
 
         start = end
@@ -111,7 +114,7 @@ def get_dataset(pred_file):
 
 dataset_to_n_leaves = {
     "amz": [5, 25],
-    "bgc": [7, 19, 120],
+    "bgc": [7, 46, 77, 16],
     "wos": [7, 138],
 }
 
@@ -127,7 +130,7 @@ def main():
     #labels = [l.numpy() for l in pred_file]
     print(f"SPECIES ONLY: {species_only}")
     # For csv (prediction) files
-    pred_file = spl_pred_y_fp
+    pred_file = bert_pred_y_fp
     
     labels = pd.read_csv(pred_file, header=None)
     labels = labels.iloc[1:].to_numpy(dtype=np.int64)
@@ -171,8 +174,10 @@ def main():
         raise ValueError(f"Unknown dataset key: {dataset}")
     ME_all = 0
     zero_rows_all = 0
+    more_pred_all = 0
     me_set = set()
     zero_set = set()
+    more_pred_set = set()
     
     for stats in count_me(pred, n_leaves):
         print(f"Level {stats['level']}:")
@@ -183,9 +188,16 @@ def main():
         zero_set.update(stats['zero_rows'])
         print(f"  Zero predictions: {stats['zero_count']}")
         zero_rows_all += stats['zero_count']
+        #print(f"Rows with zero predictions in this level: {stats['zero_rows']+2}")
 
-        print("Rows with >2 predictions in this level:")
-        print(np.setdiff1d(stats['non_exclusive_rows'], stats['zero_rows'])+1) # see which rows have 2 and above guesses
+        more_pred_set.update(stats['more_pred_rows'])
+        print(f"  >1 predictions: {stats['more_pred_count']}")
+        more_pred_all += stats['more_pred_count']
+        #print all rows with >1 predictions
+        print(f"Rows with >1 predictions in this level: {np.array(stats['more_pred_rows'])+2}")
+
+
+        #print(np.setdiff1d(stats['non_exclusive_rows'], stats['zero_rows'])+1) # see which rows have 2 and above guesses
     
     
     viol_rows = compare_hierarchy_violations(pred, ohe)

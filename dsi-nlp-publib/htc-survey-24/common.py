@@ -31,9 +31,9 @@ from src.cutils import datasets'''
 
 csv_path_full = "CUB/bird_info.csv"
 csv_path_mini = "CUB/bird_info_mini.csv"
-mat_path_dict = {"amazon":"../../spl-bert/spl/C-HMCNN/amazon_tax_matrix.npy", 
-                 "bgc":"../../spl-bert/spl/C-HMCNN/bgc_tax_matrix.npy", 
-                 "wos":"../../spl-bert/spl/C-HMCNN/wos_tax_matrix.npy",
+mat_path_dict = {"amazon":"csv/amazon_tax_matrix.npy", 
+                 "bgc":"csv/bgc_tax_matrix.npy", 
+                 "wos":"csv/wos_tax_matrix.npy",
                  "custom":"../../spl-bert/spl/C-HMCNN/custom.npy"}
 mat_path_mini = "cub_matrix_mini.npy"
 #images_dir = "CUB/CUB_200_2011/images"

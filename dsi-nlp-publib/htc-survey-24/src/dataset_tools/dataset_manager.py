@@ -12,6 +12,7 @@ from src.dataset_tools import *
 from src.utils.generic_functions import load_yaml
 from src.dataset_tools.amazon.generate_hierarchy import *
 from src.dataset_tools.wos.generate_hierarchy import *
+from src.dataset_tools.blurb.generate_hierarchy import *
 
 
 class DatasetManager:
@@ -30,13 +31,16 @@ class DatasetManager:
         # ---
         self.train_data, self.train_labels = None, None
         self.test_data, self.test_labels = None, None
+        self.val_data, self.val_labels = None, None
         # ---
         self.splitter = RepeatedStratifiedKFold(n_splits=training_config["stratifiedCV"],
                                                 n_repeats=training_config["n_repeats"],
                                                 random_state=self.seeds["stratified_fold_seed"])
         self.dataset_name = dataset_name
         
-        # --- Linux Bugs ---
+        # ---
+        # Linux Bugs
+        # ---
         if dataset_name == "bugs":
             self.__load_unsplit(read_bugs)
         # --- Web of Science ---
@@ -121,7 +125,7 @@ class DatasetManager:
 
         if self.objective == "multilabel" or self.objective == "multiclass":
             train_labels: List = [doc[-1] for doc in y_train]
-            train_labels_text: List = [doc[-1] for doc in y_train]
+            #train_labels_text: List = [doc[-1] for doc in y_train]
             test_labels: List = [doc['labels'][-1] for doc in samples_test_list]
             val_labels: List = [doc[-1] for doc in y_val]
             if self.objective == "multilabel":
@@ -228,8 +232,52 @@ class DatasetManager:
         samples_train_list = get_bgc_split_jsonl("train")
         samples_test_list = get_bgc_split_jsonl("test")
         samples_val_list = get_bgc_split_jsonl("val")
+
+        #problem: dataset annotation didn't match hierarchy levels (jumbled)
+        '''print(f"First 5 training sample labels: {[samples_train_list[a]['labels'] for a in range(5)]}")
+        quit()'''
+        
+        # Load levels and create a mapping from label to depth
+        levels_df = pd.read_csv("data/BGC/bgc_levels.csv")
+        level_map = {label: depth for label, depth in zip(levels_df['node'], levels_df['level'])}
+
+        # Remove docs with >1 label on the same level
+        for load_name, load in zip(['train','test','val'], [samples_train_list, samples_test_list, samples_val_list]):
+            filtered_load = []
+            for doc in load:
+                levels = [level_map.get(label.lower(), -1) for label in doc['labels']]
+                positive_levels = [l for l in levels if l >= 0]
+                if len(positive_levels) == len(set(positive_levels)):
+                    filtered_load.append(doc)
+            # Replace original list with filtered version
+            if load_name == 'train':
+                samples_train_list = filtered_load
+            elif load_name == 'test':
+                samples_test_list = filtered_load
+            else:
+                samples_val_list = filtered_load
+        
+        '''#Iterate through all samples to find and print samples with >1 label on the same level
+        for load_name, load in zip(['train', 'test', 'val'], [samples_train_list, samples_test_list, samples_val_list]):
+            print(f"\nChecking {load_name} set:")
+            for doc in load:
+                levels = [level_map.get(label.lower(), -1) for label in doc['labels']]
+                positive_levels = [l for l in levels if l >= 0]
+                if len(levels) != len(set(levels)):
+                    print(f"Sample with multiple labels on same level: {doc['labels']}")
+                    print(f"Corresponding levels: {levels}")
+                    quit()'''
+        
+        # Sort labels by depth for each sample
+        for doc in itertools.chain(samples_train_list, samples_test_list, samples_val_list):
+        # Only keep labels that exist in level_map
+            doc['labels'] = [l for l in doc['labels'] if level_map.get(l.lower(), -1) >= 0]
+            doc['labels'].sort(key=lambda label: level_map[label.lower()])        
+        '''print(f"First 5 training sample labels after sorting: {[samples_train_list[a]['labels'] for a in range(5)]}")
+        quit()''' #good
         # Extract all labels
         if self.objective == "multilabel" or self.objective == "multiclass":
+            #TO DO: SORT OUT ALL THE LEVEL 4 LABELS
             train_labels: List = [doc['labels'][-1] for doc in samples_train_list]
             test_labels: List = [doc['labels'][-1] for doc in samples_test_list]
             val_labels: List = [doc['labels'][-1] for doc in samples_val_list]
@@ -247,47 +295,36 @@ class DatasetManager:
             # Fill all labels with OHE from the CSV
             label_sets = [train_labels, val_labels, test_labels]
             
+            self.ohe.iloc[:, 0] = self.ohe.iloc[:, 0].str.strip().str.lower()
+
+            # Convert the ohe df into a dictionary
+            ohe_dict = {
+                row[0]: np.array(row[1:], dtype=np.float32)  # dtype optional
+                for row in self.ohe.itertuples(index=False, name=None)
+            }
             
             for i, labels in enumerate(label_sets):
-                ''' 
-                if 'Childrens-Books' in train_labels:
-                    ind = [i for i, x in enumerate(train_labels) if x == 'Childrens-Books']
-                    label_multi = []
-                    for j in ind:
-                        label_multi.append(train_labels_multi[j])
-                    print(f"childrens books in train labels:{label_multi}")
-                elif 'Childrens-Books' in test_labels:
-                    ind = [i for i, x in enumerate(test_labels) if x == 'Childrens-Books']
-                    for j in ind:
-                        label_multi.append(test_labels_multi[ind])
-                    print(f"in test labels:{label_multi}")
-                elif 'Childrens-Books' in val_labels:
-                    ind = [i for i, x in enumerate(val_labels) if x == 'Childrens-Books']
-                    for j in ind:
-                        label_multi.append(val_labels_multi[ind])
-                    print(f"in val labels:{label_multi}")
-                
-                quit()
-                '''
-
-                all_labels_list = list()
+                all_labels_list = []
                 for label in labels:
-                    matches = self.ohe[self.ohe.iloc[:, 0] == label.lower()]
-                    one_hot_vectors = matches.iloc[:, 1:].to_numpy() #remove first column
-                    if one_hot_vectors.size > 0:
-                        all_labels_list.append(one_hot_vectors)  # Note: append, NOT extend
+                    key = label.strip().lower()
+                    one_hot_vector = ohe_dict.get(key)
+                    if one_hot_vector is not None:
+                        all_labels_list.append(one_hot_vector)
                     else:
-                        raise ValueError(f"Label '{label}' not found in one-hot encoding CSV.")
-                
-                label_sets[i] = np.vstack(all_labels_list) # ohe matrix 
-            # Update original variables with one-hot encoded arrays
+                        raise ValueError(f"Label '{label}' not found in one-hot encoding dictionary.")
+                label_sets[i] = np.vstack(all_labels_list)
+                #print(next(iter(all_labels_list)))
+                #quit()
+
             self.train_labels, self.val_labels, self.test_labels = label_sets
-        else:
+        else: #OHE these too
             self.train_labels = np.array(train_labels)
             self.val_labels = np.array(val_labels)
             self.test_labels = np.array(test_labels)
         # Fetch text
         self.train_data: List[str] = [doc['text'] for doc in samples_train_list]
+        '''print(f"train data 1st item: {self.train_data[0]}")
+        quit()'''
         self.test_data: List[str] = [doc['text'] for doc in samples_test_list]
         self.val_data: List[str] = [doc['text'] for doc in samples_val_list]
 
@@ -326,7 +363,9 @@ class DatasetManager:
         return self.len
 
     def get_split_old(self):
-        # --- Linux Bugs / Web of Science / Amazon ---
+        # ---
+        # Linux Bugs / Web of Science / Amazon
+        # ---
         if self.dataset_name == "bugs" or self.dataset_name == "wos" or self.dataset_name == "amazon":
             for train_index, test_index in self.splitter.split(self.data, self.labels_for_splitter):
                 self.train_data, self.test_data = (itemgetter(*train_index)(self.data),
@@ -336,14 +375,18 @@ class DatasetManager:
                 train = list(self.train_data), np.array(self.train_labels)
                 test = list(self.test_data), np.array(self.test_labels)
                 yield train, test
-        # --- Blurb Genre Collection / RCV1-v2 ---
+        # ---
+        # Blurb Genre Collection / RCV1-v2
+        # ---
         elif self.dataset_name == "bgc" or self.dataset_name == "rcv1":
             train = self.train_data, self.train_labels
             test = self.test_data, self.test_labels
             yield train, test
     
     def get_split(self):
-        # --- Linux Bugs / Web of Science / Amazon ---
+        # ---
+        # Linux Bugs / Web of Science / Amazon
+        # ---
         if self.dataset_name == "bugs":
             for train_index, test_index in self.splitter.split(self.data, self.labels_for_splitter):
                 self.train_data, self.test_data = (itemgetter(*train_index)(self.data),
@@ -354,7 +397,9 @@ class DatasetManager:
                 test = list(self.test_data), np.array(self.test_labels)
                 yield train, test
 
-        # --- Blurb Genre Collection / RCV1-v2 ---
+        # ---
+        # Blurb Genre Collection / RCV1-v2
+        # ---
         elif self.dataset_name == "bgc" or self.dataset_name == "rcv1" or self.dataset_name == "wos" or self.dataset_name == "amazon":
             train = self.train_data, self.train_labels
             test = self.test_data, self.test_labels
@@ -362,7 +407,9 @@ class DatasetManager:
             yield train, test, val
 
     def get_split_with_indices(self):
-        # --- Linux Bugs / Web of Science / Amazon ---
+        # ---
+        # Linux Bugs / Web of Science / Amazon
+        # ---
         if self.dataset_name == "bugs" or self.dataset_name == "wos" or self.dataset_name == "amazon":
             for train_index, test_index in self.splitter.split(self.data, self.labels_for_splitter):
                 self.train_data, self.test_data = (itemgetter(*train_index)(self.data),
@@ -372,7 +419,9 @@ class DatasetManager:
                 train = list(self.train_data), np.array(self.train_labels)
                 test = list(self.test_data), np.array(self.test_labels)
                 yield train, test, train_index
-        # --- Blurb Genre Collection / RCV1-v2 ---
+        # ---
+        # Blurb Genre Collection / RCV1-v2
+        # ---
         elif self.dataset_name == "bgc" or self.dataset_name == "rcv1":
             train = self.train_data, self.train_labels
             test = self.test_data, self.test_labels
@@ -380,27 +429,27 @@ class DatasetManager:
 
 
 def main():
-    ds = DatasetManager("amazon", {"stratifiedCV": 2,
+    '''ds = DatasetManager("amazon", {"stratifiedCV": 2,
                                 "n_repeats": 1,
                                 "objective": "multilabel"})
     i = 1
     for train, test, val in ds.get_split():
         print(i)
-        i += 1
+        i += 1'''
     '''ds = DatasetManager("rcv1", {"stratifiedCV": 3,
                                  "n_repeats": 1,
                                  "objective": "multiclass"})
     i = 1
     for train, test in ds.get_split():
         print(i)
-        i += 1
+        i += 1'''
     ds = DatasetManager("bgc", {"stratifiedCV": 3,
                                 "n_repeats": 1,
-                                "objective": "multiclass"})
+                                "objective": "multilabel"})
     i = 1
-    for train, test in ds.get_split():
+    for train, test, val in ds.get_split():
         print(i)
-        i += 1'''
+        i += 1
 
 
 if __name__ == "__main__":

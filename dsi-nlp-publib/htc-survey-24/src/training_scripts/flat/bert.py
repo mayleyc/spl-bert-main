@@ -40,7 +40,7 @@ def _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
                                                      data_val=x_val, labels_val=y_val, data_test=x_test, labels_test=y_test,
                                                      logits_fn=logits_fn,
                                                      enc_=enc_)
-    trainer.train(train_load, val_load)
+    trainer.train(train_load, val_load) #val_load if config["validation"] else None)
 
     # TEST the model
     # First reload last improving epoch
@@ -159,50 +159,60 @@ def _training_testing_loop(config: Dict,
     model_folder = out_folder
     os.makedirs(model_folder, exist_ok=True)
     # config["MODEL_FOLDER"] = str(model_folder)
-    save_preds = config.get("RELOAD", False)  # <- check if this is a testing run
+    save_preds = True #config.get("RELOAD", False)  # <- check if this is a testing run
     n_repeats = config.get("n_repeats", 1)
     results = list()
-    pred_y_list, true_y_list = list(), list()
+    #pred_y_list, true_y_list = list(), list()
     # Train in splits
     fold_i: int = 0
-    for (x_train, y_train), (x_val, y_val), (x_test, y_test) in dataset.get_split():
+    for (x_train, y_train), (x_test, y_test), (x_val, y_val) in dataset.get_split():
         #fold_i += 1
         if config["RELOAD"]:
             for r in range(1, n_repeats + 1):
+                config["PATH_TO_RELOAD"] = str(model_folder / f"repeat_{r}")
                 config["MODEL_FOLDER"] = str(model_folder / f"repeat_{r}")
+                
                 metrics, y_pred, y_true = _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
                                         config, model_class, logits_fn, dataset.binarizer)
                 
                 results.append(metrics)
+                # Save predictions per repeat
+
+                if save_preds:
+                    pd.DataFrame(y_pred).to_csv(model_folder / f"y_pred_repeat_{r}_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv", index=False)
+                    pd.DataFrame(y_true).to_csv(model_folder / f"y_true_repeat_{r}_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv", index=False)
 
         else:
             for r in range(1, n_repeats + 1):
                 print(f"\n=== Repeat {r}/{n_repeats} ===")
                 config["MODEL_FOLDER"] = str(model_folder / f"repeat_{r}")
                 os.makedirs(str(model_folder / f"repeat_{r}"), exist_ok=True)
+                '''x_train_one, y_train_one = x_train[0], y_train[0]
+                print(x_train_one, y_train_one)
+                quit()''' #paranormal-fiction
                 metrics, y_pred, y_true = _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
                                         config, model_class, logits_fn, dataset.binarizer)
                 
                 results.append(metrics)
-        
-        # ---------------------------------------
-        save_results(results, out_folder, config)
-    
-        if save_preds:
-            pred_y_list.append(y_pred)
-            true_y_list.append(y_true)
 
+                if save_preds:
+                    pd.DataFrame(y_pred).to_csv(model_folder / f"y_pred_repeat_{r}_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv", index=False)
+                    pd.DataFrame(y_true).to_csv(model_folder / f"y_true_repeat_{r}_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv", index=False)
+
+    # ---------------------------------------
+    save_results(results, out_folder, config)
+    '''
     if save_preds:
         all_preds = pd.DataFrame(np.vstack(pred_y_list))
         all_trues = pd.DataFrame(np.vstack(true_y_list))
         all_preds.to_csv(out_folder / f"all_folds_pred_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv", index=False)
         all_trues.to_csv(out_folder / f"all_folds_true_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv", index=False)
-        
+        '''
 def run_configuration():
     # Paths
     config_base_path: Path = Path("config") / "BERT"
     output_path: Path = Path("dumps") / "BERT"
-    config_list: List = ["bert_bgc.yml"] #"bert_amz.yml",  #"bert_wos.yml", ] #, "bert_wos.yml", "bert_rcv1.yml", "bert_bugs.yml", 
+    config_list: List = ["bert_amz.yml", "bert_bgc.yml", "bert_wos.yml"] #"bert_amz.yml",  #"bert_wos.yml", ] #, "bert_wos.yml", "bert_rcv1.yml", "bert_bugs.yml", 
 
     for c in config_list:
         # Prepare configuration

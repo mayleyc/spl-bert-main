@@ -40,6 +40,6 @@ RELOAD: False
 PATH_TO_RELOAD: "dumps/BERT/bert_multilabel_WOS_concat_cls_3_SPL/run_2025-10-02_12-51-48" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
 EPOCH_RELOAD: 3 # Epoch to load (comment to reload the last one)
 
-stratifiedCV: 3
+stratifiedCV: 2
 n_repeats:  3
 spl: True

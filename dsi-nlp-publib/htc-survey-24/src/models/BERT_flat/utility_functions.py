@@ -91,7 +91,7 @@ def get_loss_function(enc_: Path, train_config: Dict, weights=None):
         loss_func = BCEChampLoss(**ce_args)
         print("Using BCE with CHAMP regularization")
     if match_loss:
-        edges = set()
+        edges = list()
         #classes = mlb.classes_.tolist()
         # Load classes from taxonomy file instead of mlb
         if "amazon" in train_config["taxonomy_path"]:
@@ -115,7 +115,7 @@ def get_loss_function(enc_: Path, train_config: Dict, weights=None):
                     if c not in classes:
                         continue
                     c_id = classes.index(c)
-                    edges.add((p_id, c_id))
+                    edges.append((p_id, c_id))
         if champ_loss:
             ce_args = dict(hierarchy=edges, device=train_config["DEVICE"], base_loss=loss_func)
         else:
@@ -183,6 +183,7 @@ def _setup_training(train_config, model_class: Type, workers: int, data, labels,
         mat = getattr(spl_ns, "mat", None)
         num_st_nodes = getattr(spl_ns, "num_st_nodes", None)
         size = base_model.last_layer_size # get size of last layer from model
+        print(f"Size of last layer: {size}")
 
         cmpe, gate, R = get_circuit(device, dataset_name, mat, size, num_st_nodes, S = 2, gates=2, num_reps=1)
         model = SPLBERTModel(cmpe, gate, base_model=base_model)
@@ -199,7 +200,7 @@ def _setup_training(train_config, model_class: Type, workers: int, data, labels,
     training_loader = torch.utils.data.DataLoader(train_data, batch_size=train_config["BATCH_SIZE"],
                                                   num_workers=workers, shuffle=True,
                                                   collate_fn=lambda x: collate_batch(tokenizer, x, ml=multilabel))
-    validation_loader = torch.utils.data.DataLoader(val_data, batch_size=train_config["BATCH_SIZE"],
+    validation_loader = torch.utils.data.DataLoader(val_data, batch_size=train_config["TEST_BATCH_SIZE"],
                                                     num_workers=workers, shuffle=True,
                                                     collate_fn=lambda x: collate_batch(tokenizer, x, ml=multilabel))
     test_loader = torch.utils.data.DataLoader(test_data, batch_size=train_config["TEST_BATCH_SIZE"],

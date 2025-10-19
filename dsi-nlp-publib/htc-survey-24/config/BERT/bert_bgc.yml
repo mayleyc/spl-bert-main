@@ -2,7 +2,7 @@ PRETRAINED_LM: bert-base-uncased
 FREEZE_BASE: false
 
 dataset: "bgc" # rcv1, bgc, bugs, wos, amazon
-validation: false
+validation: true
 name: "bert_multilabel_BGC"
 multilabel: true
 taxonomy_path: "data/BGC/bgc_tax.txt"
@@ -11,9 +11,9 @@ simulated_bs: 64
 
 L2_REG: 0.01
 LEARNING_RATE: 2.0e-5 # 5.0e-6 1.0e-5 5.0e-5
-BATCH_SIZE: 8
-TEST_BATCH_SIZE: 8
-EPOCHS: 3
+BATCH_SIZE: 16
+TEST_BATCH_SIZE: 32
+EPOCHS:  1
 CLF_STRATEGY: "concat_cls" # cls, concat_cls, avg_cls, mean_last, concat_mean_last, avg_mean_last
 CLF_STRATEGY_NUM_LAYERS: 3 # Only considered for concat/avg CLF_STRATEGIES
 CLASS_BALANCED_WEIGHTED_LOSS: false
@@ -37,9 +37,9 @@ EVALUATE_EVERY_K_EPOCHS: 1  # Frequency for metrics and ES check
 
 # Reload
 RELOAD: False
-PATH_TO_RELOAD: "dumps/BERT/bert_multilabel_BGC_concat_cls_3/run_2025-08-19_21-28-59" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
+PATH_TO_RELOAD: "dumps/BERT/bert_multilabel_BGC_concat_cls_3/run_2025-10-06_10-43-11" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
 EPOCH_RELOAD: 3 # Epoch to load (comment to reload the last one)
 
 stratifiedCV: 2 #3
-n_repeats: 3 #2
+n_repeats: 1 #2
 spl: False

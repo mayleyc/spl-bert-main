@@ -11,8 +11,8 @@ simulated_bs: 64
 
 L2_REG: 0.01
 LEARNING_RATE: 2.0e-5 # 5.0e-6 1.0e-5 5.0e-5
-BATCH_SIZE: 8
-TEST_BATCH_SIZE: 8
+BATCH_SIZE: 16
+TEST_BATCH_SIZE: 32
 EPOCHS: 3
 CLF_STRATEGY: "concat_cls" # cls, concat_cls, avg_cls, mean_last, concat_mean_last, avg_mean_last
 CLF_STRATEGY_NUM_LAYERS: 3 # Only considered for concat/avg CLF_STRATEGIES
