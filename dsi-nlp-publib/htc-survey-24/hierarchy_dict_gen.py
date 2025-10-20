@@ -3,14 +3,18 @@ import os
 import numpy as np
 from tqdm import tqdm
 from functools import lru_cache
+from collections import deque, defaultdict
+
 
 class TaxonomyParser():
-    def __init__(self, file_path):
+    def __init__(self, file_path, levels_file=None):
         self.file_path = file_path
         self.parent_nodes = []
         self.child_to_parent = {}
         self.leaf_nodes = []
         self.all_nodes_list = []
+        self.levels_file = pd.read_csv(levels_file) if levels_file else None
+        self.parent_to_children = defaultdict(list)
 
     def parse(self):
         # First pass: build parent-child relationships
@@ -187,6 +191,7 @@ class BGCParser(TaxonomyParser): #of different levels. does not differentiate be
                     #leaf = tokens[-1]
 
                     self.parent_nodes.append(parent)
+                    self.parent_to_children[parent] = children
                     #self.leaf_nodes.append(leaf)
 
                     for child in children:
@@ -197,7 +202,23 @@ class BGCParser(TaxonomyParser): #of different levels. does not differentiate be
         self.leaf_nodes = self.all_nodes_list
 
     def _build_one_hot(self): # all are leaves for BGC
-        # Final columns order: root first, then parents in order (excluding root), then leaves in order
+        # Final columns order: root first, then parents in order (excluding root) PER LEVEL, then leaves in order
+        
+        # BFS to get levels (without relying on premade levels file - same logic as in levels.py)
+
+        levels_in_order = []  # list of (node, level)
+        queue = deque([("root", 0)])
+
+        while queue:
+            node, lvl = queue.popleft()
+            levels_in_order.append((node, lvl))
+            for child in self.parent_to_children.get(node, []):
+                queue.append((child, lvl + 1))
+        # Sort nodes in level order
+        sorted_nodes = [node for node, lvl in levels_in_order if node != "root"]
+
+        self.leaf_nodes = sorted_nodes
+
         self.node_to_index = {node: idx for idx, node in enumerate(self.leaf_nodes)}
         #self.all_nodes_list_root = ["root"] + self.leaf_nodes
         #self.node_to_index_root = {node: i for i, node in enumerate(self.all_nodes_list_root)} # lengthy
@@ -340,7 +361,7 @@ def find_taxonomy_files(base_dir="dataset"):
 if __name__ == "__main__":
     # Replace with taxonomy file path
     folder = "csv"
-    files = ["data/BGC/bgc_tax.txt", "data/Amazon/amazon_tax.txt", "data/WebOfScience/wos_tax.txt"] 
+    files = ["data/BGC/bgc_tax.txt"]#, "data/Amazon/amazon_tax.txt", "data/WebOfScience/wos_tax.txt"] 
     for i in files:
         taxonomy_file = i #"data/BGC/bgc_tax.txt" #"data/Amazon/amazon_tax.txt" #"data/WebOfScience/wos_tax.txt" # # 
         filename = taxonomy_file.split("/")[-1].split(".")[0]
@@ -358,7 +379,7 @@ if __name__ == "__main__":
 
         # Save OHE CSV
         file_path_csv = os.path.join(folder, f"{filename}_one_hot.csv")
-        df_one_hot = pd.DataFrame.from_dict(one_hot, orient='index', columns=parser.all_nodes_list)
+        df_one_hot = pd.DataFrame.from_dict(one_hot, orient='index', columns=parser.leaf_nodes)
         df_one_hot.to_csv(file_path_csv)
         print(f"One-hot encoding saved to {file_path_csv}")
 
