@@ -11,8 +11,8 @@ simulated_bs: 64
 
 L2_REG: 0.01
 LEARNING_RATE: 2.0e-5 # 5.0e-6 1.0e-5 5.0e-5
-BATCH_SIZE: 8
-TEST_BATCH_SIZE: 8
+BATCH_SIZE: 16
+TEST_BATCH_SIZE: 16
 EPOCHS: 3
 CLF_STRATEGY: "concat_cls" # cls, concat_cls, avg_cls, mean_last, concat_mean_last, avg_mean_last
 CLF_STRATEGY_NUM_LAYERS: 3 # Only considered for concat/avg CLF_STRATEGIES
@@ -38,7 +38,7 @@ EVALUATE_EVERY_K_EPOCHS: 1  # Frequency for metrics and ES check
 # Reload
 RELOAD: False
 PATH_TO_RELOAD: "dumps/BERT/bert_multilabel_AMZ_concat_cls_3/run_2025-08-19_13-24-54" # Path to run folder (i.e. run_YYYY_MM_... NOT to fold or epoch)
-EPOCH_RELOAD: 3 # Epoch to load (comment to reload the last one)
+#EPOCH_RELOAD: 3 # Epoch to load (comment to reload the last one)
 
 stratifiedCV: 2 #2 for BERT embedding extraction, 3 for normal BERT
 n_repeats:  3 #1 for BERT embedding extraction, 2 for normal BERT

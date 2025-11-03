@@ -1,3 +1,5 @@
+WARNING! Clear relevant .sdd and .vtree files in /constraints before training anew.
+
 # Hierarchical Text Classification survey
 
 Implementations of HTC methods, used in paper:

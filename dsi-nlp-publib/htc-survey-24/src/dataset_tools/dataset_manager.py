@@ -246,8 +246,8 @@ class DatasetManager:
             filtered_load = []
             for doc in load:
                 levels = [level_map.get(label.lower(), -1) for label in doc['labels']]
-                positive_levels = [l for l in levels if l >= 0]
-                if len(positive_levels) == len(set(positive_levels)):
+                #positive_levels = [l for l in levels if l >= 0]
+                if len(levels) == len(set(levels)) and all(l >= 0 for l in levels):
                     filtered_load.append(doc)
             # Replace original list with filtered version
             if load_name == 'train':

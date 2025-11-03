@@ -20,26 +20,59 @@ from src.models.BERT_flat.bert.bert_classifier import BERTForClassification, BER
 # misc
 from common import *
 
-def get_circuit(device, dataset_name, mat, size, num_st_nodes, S = 2, gates=2, num_reps=1):
+def sdd_to_ohe_infer(alpha):
+    """
+    Convert a pysdd SDD node `alpha` to OHE samples, inferring variable order from alpha.models().
+    """
+    # Collect all variable indices seen across all models
+    all_vars = set()
+    for assignment in alpha.models():
+        all_vars.update(assignment.keys())
+    sorted_vars = sorted(all_vars)  # ascending order of variable index
+
+    num_vars = len(sorted_vars)
+    configs = []
+
+    # Map var index → column
+    var_to_col = {v: i for i, v in enumerate(sorted_vars)}
+
+    for assignment in alpha.models():
+        config = [0] * num_vars
+        for v, val in assignment.items():
+            config[var_to_col[v]] = val  # 0/1 from assignment
+        configs.append(config)
+
+    configs = torch.tensor(configs, dtype=torch.int)
+    return configs, sorted_vars  # also return inferred variable order
+
+def get_circuit(device, dataset_name, mat, size, num_st_nodes, S = 2, gates=2, num_reps=1): #default S = 2
+    #print(f"get_circuit called with: S={S}, gates={gates}, device={device}, dataset={dataset_name}")
+    #quit()
     # Create constraints if not already done
     if not os.path.exists('constraints'):
         os.makedirs('constraints')
     
     # If constraints already exist, load them
-    if not os.path.isfile('constraints/' + dataset_name + '_excl' + '.sdd') or not os.path.isfile('constraints/' + dataset_name + '_excl' + '.vtree'):
+    if not os.path.isfile('constraints/' + dataset_name + f"_{S}" + f"_{gates}" + '_excl' + '.sdd') or not os.path.isfile('constraints/' + dataset_name + f"_{S}" + f"_{gates}" + '_excl' + '.vtree'):
         # Compute matrix of ancestors R
         # Given n classes, R is an (n x n) matrix where R_ij = 1 if class i is ancestor of class j
         #np.savetxt("foo.csv", mat, delimiter=",") #Check mat
         R = np.zeros(mat.shape)
         np.fill_diagonal(R, 1)
         g = nx.DiGraph(mat)
-        layer_map = layer_mapping_BFS(g.reverse(copy=True), num_st_nodes) # 1-indexed # keep original g
-        #print(layer_map)
-        #quit()
+        #layer_map = layer_mapping_sorted_nodes(g.reverse(copy=True), get_sorted_nodes(dataset_name))
+        sorted_nodes, layer_map = get_sorted_nodes(dataset_name) # 1-indexed # keep original g
+        '''print(layer_map)
+        quit()'''
         for i in range(len(mat)):
             descendants = list(nx.descendants(g, i))
             if descendants:
                 R[i, descendants] = 1
+        '''g = nx.DiGraph(mat.T)  # transpose: now edges go from parent → child
+        for i in range(len(mat)):
+            ancestors = list(nx.ancestors(g, i))  # get all ancestors
+            if ancestors:
+                R[i, ancestors] = 1'''
         R = torch.tensor(R)
 
         #Transpose to get the ancestors for each node 
@@ -133,15 +166,44 @@ def get_circuit(device, dataset_name, mat, size, num_st_nodes, S = 2, gates=2, n
             alpha.ref()
             old_alpha.deref()
 
-        print("alpha after beta hierarchy:", alpha.is_true(), alpha.is_false(), alpha.model_count()) #25 because no ME
+        '''configs, inferred_order = sdd_to_ohe_infer(alpha)
+        print("Number of samples:", configs.size(0))
+        print("Number of variables:", configs.size(1))
+        print("First 5 OHE samples:\n", configs[:5])
+        print("Variable order:", inferred_order)
+        quit()
+        # alpha.models() gives satisfying assignments
+        num_samples = 5
+        samples = list(alpha.models())[:num_samples]
+
+        for idx, assignment in enumerate(samples):
+            print(f"\nSample {idx + 1}:")
+            # Convert assignment dict -> ordered vector
+            vec = [assignment[i+1] for i in range(mat.shape[0])]  # 1-indexed in SDD
+            print(vec)
+            
+            # Check against matrix: all 1s in vec must have their ancestors also 1
+            valid = True
+            for i, val in enumerate(vec):
+                if val == 1:
+                    # Ancestors of i
+                    ancestors = np.where(mat[i] == 1)[0]
+                    if not all(vec[j] == 1 for j in ancestors):
+                        valid = False
+                        print(f"Invalid at node {inferred_order[i]}: ancestors {ancestors} not satisfied")
+            print("Valid configuration?" , valid)
+        quit()'''
+        
         #print_satisfying_configs(alpha, R.size(0))
+        print("alpha after every constraint:", alpha.is_true(), alpha.is_false(), alpha.model_count())
+        #quit()
 
 
-        alpha.save(str.encode('constraints/' + dataset_name + '_excl'+ '.sdd'))
-        alpha.vtree().save(str.encode('constraints/' + dataset_name + '_excl'+ '.vtree'))
+        alpha.save(str.encode('constraints/' + dataset_name + f"_{S}" + f"_{gates}" + '_excl'+ '.sdd'))
+        alpha.vtree().save(str.encode('constraints/' + dataset_name + f"_{S}" + f"_{gates}"+ '_excl'+ '.vtree'))
         
     # Create circuit object
-    cmpe = CircuitMPE('constraints/' + dataset_name + '_excl'+ '.vtree', 'constraints/' + dataset_name + '_excl'+ '.sdd')
+    cmpe = CircuitMPE('constraints/' + dataset_name + f"_{S}" + f"_{gates}" + '_excl'+ '.vtree', 'constraints/' + dataset_name + f"_{S}" + f"_{gates}" + '_excl'+ '.sdd')
     
 
     if S > 0:

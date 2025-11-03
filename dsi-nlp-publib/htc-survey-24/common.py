@@ -43,10 +43,35 @@ ohe_csv = "amazon_tax_one_hot.csv"
 
 emb_model_name = "bert-base-uncased"
 pred_y_folder = "pred_y"
+l_files = ["data/BGC/bgc_tax_levels.csv", "data/Amazon/amazon_tax_levels.csv", "data/WebOfScience/wos_tax_levels.csv"]
 
 
 def find_files_with_string(directory, search_string):
     return [f for f in Path(directory).iterdir() if search_string in f.name]
+
+def find_folders_with_string(directory, search_string):
+    return [f for f in Path(directory).iterdir() if f.is_dir() and search_string in f.name]
+
+
+
+def find_latest_results(folder, files_match):
+    # Get all matching result files in the directory
+    
+    date_strings = [os.path.splitext(os.path.basename(file))[0].split("_")[-1] for file in files_match]
+
+    # Convert strings to datetime objects
+    dates = [datetime.datetime.strptime(d, "%Y%m%d-%H%M%S") for d in date_strings]
+
+    # Find the latest date
+    latest_date = max(dates)
+
+    # Convert back to string for search
+    latest_date_string = latest_date.strftime("%Y%m%d-%H%M%S")
+
+    best_file = find_files_with_string(pred_y_folder, latest_date_string)
+    best_file = best_file[0]
+
+    return best_file
 
 # Finds the best .pth file by model name and retrieve .pth with best loss
 def find_best_pth_file(model_name:str):
@@ -513,7 +538,7 @@ def layer_mapping_BFS_old(g): #g = nx.DiGraph(mat)
 
     return layer_map'''
 
-def layer_mapping_BFS(g, num_start_nodes=1):
+'''def layer_mapping_BFS(g, num_start_nodes=1):
     """
     g: a directed graph (nx.DiGraph) NOTE: edges of g = nx.DiGraph(mat) might be pointed up instead of down
     num_start_nodes: number of nodes to treat as level 0 if no roots exist
@@ -536,6 +561,67 @@ def layer_mapping_BFS(g, num_start_nodes=1):
             queue.extend((child, depth + 1) for child in g.successors(node))
 
     return layer_map
+'''
+def get_sorted_nodes(dataset: str):
+    """
+    dataset: dataset name
+    Returns:
+        sorted_nodes: list of nodes in BFS/topological order from your parser
+        level_map: dict mapping node -> level/depth in taxonomy
+    """
+    l = [i for i in l_files if dataset in i][0]
+    sorted_nodes = []
+    level_map = {}
+
+    df = pd.read_csv(l)
+    for i, row in df.iterrows():
+        node = row["node"]
+        level = row["level"]
+        sorted_nodes.append(node)
+        if node == "root":
+            continue
+        else:
+            level_map[i-1] = level-1  # 0-indexed levels
+
+    return [node for node in sorted_nodes if node != "root"], level_map
+
+'''def layer_mapping_sorted_nodes(g, sorted_nodes):
+    """
+    g: nx.DiGraph representing the hierarchy
+    sorted_nodes: list of nodes in topological / hierarchical order
+    Returns a dictionary {node: layer_index}
+    """
+    layer_map = {}
+    for i, node in enumerate(sorted_nodes):
+        # Get ancestors of this node
+        ancestors = list(nx.ancestors(g, i))
+        if not ancestors:
+            # No ancestors → top layer
+            layer_map[node] = 0
+        else:
+            # Layer is 1 + max layer of ancestors
+            ancestor_layers = [layer_map[a] for a in ancestors if a in layer_map]
+            if ancestor_layers:
+                layer_map[node] = 1 + max(ancestor_layers)
+            else:
+                layer_map[node] = 0
+    return layer_map'''
+
+'''def layer_mapping_BFS_indices(g):
+    # Level 0 = nodes with in-degree 0
+    start_nodes = [n for n, deg in g.in_degree() if deg == 0]
+
+    layer_map = {}
+    queue = [(node, 0) for node in start_nodes]
+
+    while queue:
+        node, depth = queue.pop(0)
+        if node not in layer_map:
+            layer_map[node] = depth
+            for child in g.successors(node):
+                queue.append((child, depth + 1))
+    
+    return layer_map'''
 
 def get_constr_out(x, R):
     """ Given the output of the neural network x returns the output of MCM given the hierarchy constraint expressed in the matrix R """

@@ -1,4 +1,3 @@
-# checking tax files to see if any node at level n appears before a node at level n-1
 import sys
 
 def check_taxonomy_integrity(taxonomy_file):
@@ -6,7 +5,7 @@ def check_taxonomy_integrity(taxonomy_file):
     Checks the integrity of a taxonomy file.
     
     Ensures that a node is defined as a child before it is used as a parent
-    in a subsequent line, which also ensures that no node at level n
+    in a subsequent line: no node at level n
     appears before a node at level n-1.
     """
     defined_nodes = {'root'}

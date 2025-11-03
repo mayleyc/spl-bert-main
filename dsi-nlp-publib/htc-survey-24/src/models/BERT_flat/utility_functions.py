@@ -246,6 +246,95 @@ def _setup_training(train_config, model_class: Type, workers: int, data, labels,
                           add_start_time_folder=False)
     return trainer, training_loader, validation_loader, test_loader
 
+def _setup_training_hyper(train_config, model_class: Type, workers: int, data, labels, data_val, labels_val, data_test, labels_test,
+                    logits_fn: Callable, enc_: Path, **spl_args):
+    # -------------------------------
+    tokenizer = AutoTokenizer.from_pretrained(train_config["PRETRAINED_LM"])
+    # dataset_class = TransformerDatasetFlat
+    multilabel, champ_loss, match_loss = (train_config["multilabel"],
+                                          train_config.get("CHAMP_LOSS", False),
+                                          train_config.get("MATCH_LOSS", False))
+
+    args_d = dict(remove_garbage=train_config["REMOVE_GARBAGE_TEXT"], multilabel=multilabel, encoder_path=enc_)
+    train_data = TransformerDatasetFlat(data, labels, **args_d)
+    val_data = TransformerDatasetFlat(data_val, labels_val, **args_d)
+    test_data = TransformerDatasetFlat(data_test, labels_test, **args_d)
+    train_config["n_class"] = train_data.n_y
+    spl = train_config["spl"]
+    # Initialize model
+    if spl:
+        base_model = model_class(**train_config)
+
+        spl_ns = SimpleNamespace(**spl_args)
+        
+        device = getattr(spl_ns, "device", "cuda:0")  # default device
+        dataset_name = getattr(spl_ns, "dataset_name", None)
+        mat = getattr(spl_ns, "mat", None)
+        num_st_nodes = getattr(spl_ns, "num_st_nodes", None)
+        size = base_model.last_layer_size # get size of last layer from model
+        print(f"Size of last layer: {size}")
+
+        cmpe, gate, R = get_circuit(device, dataset_name, mat, size, num_st_nodes, S = spl_args["S"], gates=spl_args["gates"], num_reps=1)
+        model = SPLBERTModel(cmpe, gate, base_model=base_model)
+
+    else:
+        model = model_class(**train_config)
+
+    # Initialize Optimizer and loss
+    opt = torch.optim.AdamW(model.parameters(), lr=train_config["LEARNING_RATE"], weight_decay=train_config["L2_REG"])
+
+    early_stopper = EarlyStopping(*train_config["EARLY_STOPPING"].values())
+    # -------------------------------
+    # Prepare dataset
+    training_loader = torch.utils.data.DataLoader(train_data, batch_size=train_config["BATCH_SIZE"],
+                                                  num_workers=workers, shuffle=True,
+                                                  collate_fn=lambda x: collate_batch(tokenizer, x, ml=multilabel))
+    validation_loader = torch.utils.data.DataLoader(val_data, batch_size=train_config["TEST_BATCH_SIZE"],
+                                                    num_workers=workers, shuffle=True,
+                                                    collate_fn=lambda x: collate_batch(tokenizer, x, ml=multilabel))
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size=train_config["TEST_BATCH_SIZE"],
+                                                    num_workers=workers, shuffle=True,
+                                                    collate_fn=lambda x: collate_batch(tokenizer, x, ml=multilabel))
+    # -------------------------------
+    w = None
+    if train_config["CLASS_BALANCED_WEIGHTED_LOSS"] is True:
+        w = compute_class_weights(train_data).to(train_config["DEVICE"])
+
+    if not multilabel:
+        if train_config["CLASS_BALANCED_WEIGHTED_LOSS"] is True:
+            loss_func = lambda *x, **k: ce_loss(*x, **k, weight=w)
+            print("Using weighted CE loss (multiclass)")
+        else:
+            loss_func = ce_loss
+            print("Using CE loss (multiclass)")
+    else:
+        loss_func = get_loss_function(enc_, train_config, weights=w)
+    
+    if spl:
+        loss_func = lambda pred, y, nll, l, device: nll #uses nll instead of standard loss
+
+    # -------------------------------
+    # Metrics
+    metrics = MetricSet({
+        "-": (
+            tm.MetricCollection({
+                "f1_macro": tm.F1Score(average="macro", num_classes=train_data.n_y),
+                "acc_macro": tm.Accuracy(average="macro", num_classes=train_data.n_y, subset_accuracy=True)
+            }),
+            logits_fn
+        )
+    })
+    # -------------------------------
+    # Initiate training
+    if train_config.get("gradient_accum_train"):
+        print(f"Running with gradient accumulation: Simulated bs: {train_config['simulated_bs']}")
+        trainer = GradientAccumulatorTrainer(model, train_config, loss_func, opt,
+                                             early_stopper, metrics, unpack_flag=False)
+    else:
+        trainer = Trainer(model, train_config, loss_func, opt, early_stopper, metrics, unpack_flag=False,
+                          add_start_time_folder=False)
+    return trainer, training_loader, validation_loader, test_loader
+
 def _setup_training_kfold(train_config, model_class: Type, workers: int, data, labels, data_val, labels_val,
                     logits_fn: Callable, enc_: Path):
     # -------------------------------

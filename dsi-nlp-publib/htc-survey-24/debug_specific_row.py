@@ -1,7 +1,6 @@
 import pandas as pd
 from collections import defaultdict
 
-# The row you provided
 target_node = "world-war-ii-military-history"
 
 # Load the ground truth for levels

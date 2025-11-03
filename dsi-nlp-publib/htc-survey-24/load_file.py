@@ -4,6 +4,9 @@ from tqdm import tqdm
 from typing import List
 import pandas as pd
 import numpy as np
+import os
+import numbers
+
 
 #file = Path("data") / "Bugs" / "linux_bugs.csv"
 file = Path("data") / "Amazon" / "amazon_train.jsonl"
@@ -85,8 +88,37 @@ def merge_jsonl_files(input_files: List[Path]) -> None:
                 for line in tqdm(in_f):
                     out_f.write(line)
 
+# Recursive function to round numbers
+def round_numbers(obj):
+    if isinstance(obj, numbers.Number):  # Check if it's a number
+        return round(obj, 3) # edit the number of decimal places here
+    elif isinstance(obj, list):
+        return [round_numbers(x) for x in obj]
+    elif isinstance(obj, tuple):
+        return tuple(round_numbers(x) for x in obj)
+    elif isinstance(obj, dict):
+        return {k: round_numbers(v) for k, v in obj.items()}
+    else:
+        return obj
+    
+def load_pkl(file_path: Path):
+    import pickle
+    with open(file_path, "rb") as f:
+        data = pickle.load(f)
+        
+    return data
+
 if __name__ == "__main__":
-    search_in_jsonl(file, "it was interesting to see all the positive one and two word reviews but very few stating")
+    folder = Path("dumps")
+    pkls = [p for p in folder.iterdir() if p.suffix == ".pkl" and "spl_bert_hard" in p.name]  # full Path objects
+    for fp in pkls:
+        print("Loading pkl file:", fp.name)
+        data = load_pkl(fp)
+        rounded_data = round_numbers(data)
+        print("pkl contents:", rounded_data)
+    
+
+    #search_in_jsonl(file, "it was interesting to see all the positive one and two word reviews but very few stating")
 
     #with open(_output_data, "r", encoding="utf-8") as f:
     #    print(f.readline())

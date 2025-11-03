@@ -11,7 +11,7 @@ from src.dataset_tools.dataset_manager import DatasetManager
 from src.models.BERT_flat.bert.bert_classifier import BERTForClassification, BERTForClassification_SPL
 from src.models.BERT_flat.bert.cmpe import *
 
-from src.models.BERT_flat.utility_functions import _setup_training, _predict
+from src.models.BERT_flat.utility_functions import _setup_training_hyper, _predict
 from src.training_scripts.script_utils import save_results
 from src.utils.generic_functions import load_yaml, get_model_dump_path
 from src.utils.metrics import compute_metrics, compute_hierarchical_metrics
@@ -39,7 +39,7 @@ def _train_single_split(x_train, x_val, x_test, y_train, y_val, y_test,
                         config: Dict, model_class: Type,
                         logits_fn, enc_: Path, **spl_args):
     # Create and train a model
-    trainer, train_load, val_load, test_load = _setup_training(train_config=config, model_class=model_class,
+    trainer, train_load, val_load, test_load = _setup_training_hyper(train_config=config, model_class=model_class,
                                                      workers=workers,
                                                      data=x_train, labels=y_train,
                                                      data_val=x_val, labels_val=y_val, data_test=x_test, labels_test=y_test,
@@ -218,47 +218,55 @@ def _training_testing_loop(config: Dict,
 def run_configuration():
     # Paths
     config_base_path: Path = Path("config") / "BERT"
-    output_path: Path = Path("dumps") / "BERT_SPL"
-    config_list: List = ["bert_amz_spl.yml", "bert_bgc_spl.yml", "bert_wos_spl.yml"]#"bert_wos_spl.yml", "bert_amz_spl.yml", "bert_bgc_spl.yml"] #] #, "bert_wos.yml", "bert_rcv1.yml", "bert_bugs.yml", 
+    output_path: Path = Path("dumps") / "BERT_SPLHYPER"
+    config_list: List = ["bert_bgc_spl.yml", "bert_wos_spl.yml", "bert_amz_spl.yml"]#, "bert_bgc_spl.yml"] #] #, "bert_wos.yml", "bert_rcv1.yml", "bert_bugs.yml", 
 
     for c in config_list:
         # Prepare configuration
         config_path: Path = (config_base_path / c)
         config: Dict = load_yaml(config_path)
         
-        specific_model = f"{config['name']}_{config['CLF_STRATEGY']}_{config['CLF_STRATEGY_NUM_LAYERS']}_SPL"
+        specific_model = f"{config['name']}_{config['CLF_STRATEGY']}_{config['CLF_STRATEGY_NUM_LAYERS']}_SPLhyper"
         
         spl = config['spl']
         dataset_name = config["dataset"]
         num_st_nodes = hierarchy_num[dataset_name][0]
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         mat = np.load(mat_path_dict[dataset_name])
-        # Prepare matrix
-        
         spl_args = {
-                    "spl": spl, 
-                    "dataset_name": dataset_name, 
-                    "mat": mat,
-                    "num_st_nodes": num_st_nodes, 
-                    "device": device
-                }
-        
-        print(f"Specific model: {specific_model}")
-        print(f"Dataset: {config['dataset']}")
-        # Prepare output
-        out_folder = output_path / specific_model / f"run_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+            "spl": spl, 
+            "dataset_name": dataset_name, 
+            "mat": mat,
+            "num_st_nodes": num_st_nodes, 
+            "device": device,
+        }
 
-        kw = dict()
-        if config["RELOAD"] is True:
-            reload_path = Path(config["PATH_TO_RELOAD"])
-            kw = dict(split_fun=lambda f: get_model_dump_path(reload_path, f, config.get("EPOCH_RELOAD", None)))
-            out_folder = reload_path
+        # Defaults are S=2, gates=2
+        S_values = [0, 4]
+        gates_values = [1, 3]
+        for s_val in S_values:
+            for gates in gates_values:
+                spl_args["S"] = s_val
+                spl_args["gates"] = gates
+                print(f"Running with S={s_val}, gates={gates}")
+                
+                specific_model = f"{config['name']}_{config['CLF_STRATEGY']}_{config['CLF_STRATEGY_NUM_LAYERS']}_SPLhyper_S{s_val}_gates{gates}"
+                print(f"Specific model: {specific_model}")
+                print(f"Dataset: {config['dataset']}")
+                # Prepare output
+                out_folder = output_path / specific_model / f"run_{dt.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
 
-        # Train
-        run_training(config=config,
-                    dataset=config["dataset"],
-                    model_class=BERTForClassification_SPL,
-                    out_folder=out_folder, **kw, **spl_args)
+                kw = dict()
+                if config["RELOAD"] is True:
+                    reload_path = Path(config["PATH_TO_RELOAD"])
+                    kw = dict(split_fun=lambda f: get_model_dump_path(reload_path, f, config.get("EPOCH_RELOAD", None)))
+                    out_folder = reload_path
+
+                # Train
+                run_training(config=config,
+                            dataset=config["dataset"],
+                            model_class=BERTForClassification_SPL,
+                            out_folder=out_folder, **kw, **spl_args)
 
 
 if __name__ == "__main__":
