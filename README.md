@@ -12,8 +12,9 @@ This folder contains the main experiments with SPL-BERT and its competitor BERT-
 - `/csv`** contains the multi-hot encoding dictionaries and the ancestor matrices, both are generated from `hierarchy_dict_gen.py`
 - `/src`* contains the base models, losses, circuits and training scripts for SPL-BERT, BERT-Naive and BERT-MATCH, along with other preprocessing tools for **htc-survey** models
 
-* indicate folders adapted from **htc-survey**
-** are folders belonging to SPL
+`*` indicate folders adapted from **htc-survey**
+
+`**` are folders belonging to SPL
 
 ## How to run
 1. Install the environment by running
