@@ -17,11 +17,13 @@ This folder contains the main experiments with SPL-BERT and its competitor BERT-
 `**` are folders belonging to SPL
 
 ## How to run
+
 1. Install the environment by running
 `
 cd dsi-nlp-publib/htc-survey-24
 conda env create -f environment.yml
 `
+
 2. Download and prepare the dataset (e.g. generate_hierarchy.py for BGC) according to **htc-survey** instructions.
 Lowercase the `.tax` files using the script `lowercase.py`
 
@@ -36,6 +38,7 @@ python -m src.training_script.flat.bert_match
 `
 
 For SPL-BERT:
+
 3. First generate the level map using 
 `
 python levels.py
@@ -44,6 +47,7 @@ Then, generate the multi-hot encoding dictionaries and matrices using
 `
 python hierarchy_dict_gen.py
 `
+
 4. Delete the corresponding .sdd & .vtree files in `/constraints` (if previously created). Then run the SPL-BERT script:
 `
 python -m src.training_script.flat.spl-bert
